@@ -3,6 +3,7 @@
 // 权重与 TECH_SPEC §8 对齐: 0.55 语义 + 0.20 地点 + 0.15 类别 + 0.10 时间
 // 注意: 未校准 heuristic,仅用于候选排序,不自动合并
 import { prisma } from '@/lib/prisma'
+import { resolveOrgId } from '@/lib/demo-context'
 
 export interface DuplicateCandidate {
   caseId: string
@@ -39,7 +40,7 @@ export async function findDuplicates(params: FindDuplicatesParams): Promise<Dupl
     title,
     categoryCode,
     locationText,
-    organizationId = 'demo-org',
+    organizationId,
     excludeCaseId,
     limit = 3,
   } = params
@@ -48,10 +49,13 @@ export async function findDuplicates(params: FindDuplicatesParams): Promise<Dupl
     return []
   }
 
+  // 解析组织 (demo-org 别名 → seed 组织真实 cuid)
+  const orgId = await resolveOrgId(organizationId)
+
   // 1. 拉取同组织、未关闭的候选池 (不限定类别,让 Hard Negative 也能出现)
   const candidates = await prisma.case.findMany({
     where: {
-      organizationId,
+      organizationId: orgId,
       status: { notIn: ['CLOSED', 'CANCELED'] },
       ...(excludeCaseId ? { id: { not: excludeCaseId } } : {}),
     },

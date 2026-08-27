@@ -1,6 +1,7 @@
 // POST /api/intakes - 创建 Intake
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { resolveOrgId } from '@/lib/demo-context'
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,9 +25,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // 解析组织 (demo-org 别名 → seed 组织真实 cuid)
+    const orgId = await resolveOrgId(organizationId)
+
     const intake = await prisma.intake.create({
       data: {
-        organizationId,
+        organizationId: orgId,
         sourceType,
         rawText,
         idempotencyKey,

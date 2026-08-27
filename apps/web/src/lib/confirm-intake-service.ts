@@ -56,6 +56,11 @@ export async function confirmIntake(params: ConfirmIntakeParams): Promise<Confir
         throw new Error('INTAKE_NOT_FOUND')
       }
 
+      // 幂等保护: 已确认的 Intake 拒绝重复提交 (防止重复创建 Case)
+      if (intake.status === 'CONFIRMED') {
+        throw new Error('INTAKE_ALREADY_CONFIRMED')
+      }
+
       // 2. 校验 Analysis
       const analysis = await tx.intakeAnalysis.findUnique({
         where: { id: analysisId },

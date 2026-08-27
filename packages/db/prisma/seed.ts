@@ -176,13 +176,20 @@ async function main() {
   console.log('✅ Intakes created')
 
   console.log('🎉 Demo seed data complete!')
+  return { orgId: org.id }
 }
 
-main()
-  .catch((e) => {
-    console.error('❌ Seed failed:', e)
-    process.exit(1)
-  })
-  .finally(async () => {
-    await prisma.$disconnect()
-  })
+// 导出供 reset-demo.ts 复用
+export default main
+
+// 直接运行时才自动执行 (被 import 时不执行)
+if (process.argv[1]?.endsWith('seed.ts')) {
+  main()
+    .catch((e) => {
+      console.error('❌ Seed failed:', e)
+      process.exit(1)
+    })
+    .finally(async () => {
+      await prisma.$disconnect()
+    })
+}
