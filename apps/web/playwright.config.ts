@@ -11,6 +11,10 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
+    // 使用已安装的 Chromium 1223
+    launchOptions: {
+      executablePath: 'C:\\Users\\14536\\AppData\\Local\\ms-playwright\\chromium-1223\\chrome-win64\\chrome.exe',
+    },
   },
   projects: [
     {
