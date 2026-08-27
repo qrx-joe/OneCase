@@ -39,7 +39,8 @@ export default function IntakeReviewPage() {
 
   const [analysisId, setAnalysisId] = useState<string | null>(null)
   const [issues, setIssues] = useState<Issue[]>([])
-  const [candidates, setCandidates] = useState<DuplicateCandidate[]>([])
+  // 每个 issue 一组候选: candidates[issueIndex] = DuplicateCandidate[]
+  const [candidates, setCandidates] = useState<DuplicateCandidate[][]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -62,23 +63,29 @@ export default function IntakeReviewPage() {
         setAnalysisId(data.data.analysisId)
         setIssues(data.data.issues || [])
 
-        // 2. 获取第一个 issue 的 Duplicate 候选
+        // 2. 为每个 issue 并行获取 Duplicate 候选 (草稿字段直传评分)
         if (data.data.issues?.length > 0) {
-          const first = data.data.issues[0]
-          const dupRes = await fetch('/api/duplicates/find', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              caseId: `draft-${intakeId}-0`,
-              title: first.title,
-              categoryCode: first.categoryCode,
-              locationText: first.locationText,
-            }),
-          })
-          const dupData = await dupRes.json()
-          if (dupRes.ok && dupData.data?.candidates) {
-            setCandidates(dupData.data.candidates)
-          }
+          const allCandidates = await Promise.all(
+            data.data.issues.map(async (issue: Issue) => {
+              try {
+                const dupRes = await fetch('/api/duplicates/find', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    title: issue.title,
+                    categoryCode: issue.categoryCode,
+                    locationText: issue.locationText,
+                    organizationId: 'demo-org',
+                  }),
+                })
+                const dupData = await dupRes.json()
+                return dupRes.ok && dupData.data?.candidates ? dupData.data.candidates : []
+              } catch {
+                return [] // Duplicate 检索失败不阻塞 Review
+              }
+            })
+          )
+          setCandidates(allCandidates)
         }
       } catch (e) {
         console.error('Load review failed:', e)
@@ -268,7 +275,12 @@ export default function IntakeReviewPage() {
                       ? decision.decision === 'CREATE_CASE'
                         ? '✓ 将创建新 Case'
                         : decision.decision === 'LINK_EXISTING'
-                        ? `✓ 将关联 ${decision.targetCaseId?.slice(0, 12)}...`
+                        ? (() => {
+                            const linked = (candidates[idx] || []).find(
+                              (c) => c.caseId === decision.targetCaseId
+                            )
+                            return linked ? `✓ 将关联 ${linked.caseNumber}` : '✓ 将关联已有 Case'
+                          })()
                         : '已跳过'
                       : '请选择操作'}
                   </span>
@@ -294,49 +306,66 @@ export default function IntakeReviewPage() {
           })}
         </div>
 
-        {/* 右侧: Duplicate 候选 */}
+        {/* 右侧: Duplicate 候选 (按 issue 分组展示) */}
         <div style={{ display: 'grid', gap: 12, alignContent: 'start' }}>
-          <div className="duplicate-card">
-            <div className="dup-head">
-              <h3>相似事项候选</h3>
-              <p>候选仅用于辅助判断，不会自动合并。评分未校准。</p>
-            </div>
-
-            {candidates.length === 0 ? (
-              <div style={{ padding: '20px 15px' }}>
-                <p style={{ fontSize: 10, color: 'var(--text-3)', textAlign: 'center' }}>
-                  暂无相似候选,建议创建新 Case
-                </p>
-              </div>
-            ) : (
-              candidates.map((c) => (
-                <div key={c.caseId} className="dup-item">
-                  <div className="dup-score">
-                    <b>{c.caseNumber}</b>
-                    <span className="score">{c.score >= 0.7 ? '高相似' : '中相似'}</span>
-                  </div>
-                  <div className="dup-title">{c.title}</div>
-                  <div className="match-list">
-                    {c.matchReasons.map((r, i) => (
-                      <span key={i} className="match-tag">✓ {r}</span>
-                    ))}
-                  </div>
-                  <div className="dup-actions">
-                    <Button
-                      variant={decisions[0]?.decision === 'LINK_EXISTING' && decisions[0]?.targetCaseId === c.caseId ? 'primary' : 'outline'}
-                      size="sm"
-                      onClick={() => setDecision(0, 'LINK_EXISTING', c.caseId)}
-                    >
-                      关联到事项 1
-                    </Button>
-                    <Button variant="ghost" size="sm">
-                      查看详情
-                    </Button>
-                  </div>
+          {issues.map((issue, idx) => {
+            const issueCandidates = candidates[idx] || []
+            const decision = decisions[idx]
+            return (
+              <div key={idx} className="duplicate-card">
+                <div className="dup-head">
+                  <h3>事项 {idx + 1} 的相似候选</h3>
+                  <p>候选仅用于辅助判断，不会自动合并。评分未校准。</p>
                 </div>
-              ))
-            )}
-          </div>
+
+                {issueCandidates.length === 0 ? (
+                  <div style={{ padding: '20px 15px' }}>
+                    <p style={{ fontSize: 10, color: 'var(--text-3)', textAlign: 'center' }}>
+                      暂无相似候选,建议创建新 Case
+                    </p>
+                  </div>
+                ) : (
+                  issueCandidates.map((c) => (
+                    <div key={c.caseId} className="dup-item">
+                      <div className="dup-score">
+                        <b>{c.caseNumber}</b>
+                        <span className="score">{c.score >= 0.7 ? '高相似' : '中相似'}</span>
+                      </div>
+                      <div className="dup-title">{c.title}</div>
+                      <div className="match-list">
+                        {c.matchReasons.map((r, i) => (
+                          <span key={i} className="match-tag">✓ {r}</span>
+                        ))}
+                      </div>
+                      <div className="dup-actions">
+                        <Button
+                          variant={
+                            decision?.decision === 'LINK_EXISTING' && decision?.targetCaseId === c.caseId
+                              ? 'primary'
+                              : 'outline'
+                          }
+                          size="sm"
+                          onClick={() => setDecision(idx, 'LINK_EXISTING', c.caseId)}
+                        >
+                          关联此 Case
+                        </Button>
+                        <a
+                          href={`/cases/${c.caseNumber}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ textDecoration: 'none' }}
+                        >
+                          <Button variant="ghost" size="sm">
+                            查看详情
+                          </Button>
+                        </a>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )
+          })}
 
           <div className="privacy-note">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
