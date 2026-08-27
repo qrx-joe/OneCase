@@ -1,23 +1,32 @@
 // app/cases/[id]/page.tsx
-// Case Detail 页面
+// Case Detail 页面 (真实数据: GET /api/cases/[id])
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
+import Link from 'next/link'
 import { AppLayout } from '@/components/AppLayout'
 import { Button, Badge } from '@/components'
 
-interface Source {
+interface SourceDetail {
+  id: string
+  issueIndex: number
+  createdAt: string
   intake: {
-    rawText: string
+    id: string
+    rawText: string | null
+    status: string
     createdAt: string
-  }
+  } | null
 }
 
-interface Action {
-  action: string
-  fromValue?: string
+interface TimelineEvent {
+  id: string
+  type: string
+  title: string
+  fromValue?: string | null
   toValue: string
-  note?: string
+  note?: string | null
   createdAt: string
 }
 
@@ -27,128 +36,104 @@ interface CaseDetail {
   title: string
   status: string
   priority: string
-  summary?: string
-  categoryCode?: string
-  locationText?: string
-  assigneeId?: string
-  sources: Source[]
-  actions: Action[]
+  summary?: string | null
+  categoryCode?: string | null
+  locationText?: string | null
+  assigneeId?: string | null
+  version: number
+  createdAt: string
+  updatedAt: string
+  sources: SourceDetail[]
+  timeline: TimelineEvent[]
 }
 
-export default function CaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
+const STATUS_LABELS: Record<string, { label: string; variant: 'blue' | 'orange' | 'green' | 'gray' }> = {
+  OPEN: { label: '待处理', variant: 'blue' },
+  IN_PROGRESS: { label: '处理中', variant: 'orange' },
+  WAITING: { label: '等待外部', variant: 'gray' },
+  RESOLVED: { label: '已解决', variant: 'green' },
+  CLOSED: { label: '已关闭', variant: 'gray' },
+  CANCELED: { label: '已取消', variant: 'gray' },
+}
+
+const CATEGORY_LABELS: Record<string, string> = {
+  PUBLIC_FACILITIES: '公共设施',
+  ENVIRONMENT: '环境卫生',
+  NOISE: '噪音邻里',
+  SAFETY: '安全隐患',
+  PARKING: '停车管理',
+}
+
+export default function CaseDetailPage() {
+  const params = useParams()
+  const id = params.id as string
+
   const [caseData, setCaseData] = useState<CaseDetail | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // TODO: 实现 GET /api/cases/:id
-    // 当前 Mock
-    setTimeout(() => {
-      setCaseData({
-        id: '1',
-        caseNumber: 'CASE-018',
-        title: '3栋2单元楼道照明故障',
-        status: 'IN_PROGRESS',
-        priority: 'P2',
-        summary: '3栋2单元楼道照明设施反复出现故障,多位居民反馈夜间通行较暗,存在老人通行安全风险。',
-        categoryCode: 'PUBLIC_FACILITIES',
-        locationText: '3栋2单元',
-        assigneeId: '1',
-        sources: [
-          {
-            intake: {
-              rawText: '三栋楼道晚上特别黑,灯好像又坏了。',
-              createdAt: '2026-08-24T09:22:00Z',
-            },
-          },
-          {
-            intake: {
-              rawText: '三栋二单元那个灯又坏了,我妈昨天晚上回来差点摔倒。',
-              createdAt: '2026-08-27T16:42:00Z',
-            },
-          },
-        ],
-        actions: [
-          {
-            action: 'STATUS_CHANGE',
-            fromValue: 'OPEN',
-            toValue: 'IN_PROGRESS',
-            createdAt: '2026-08-25T14:08:00Z',
-          },
-          {
-            action: 'ASSIGN',
-            fromValue: '待分派',
-            toValue: '物业协调',
-            createdAt: '2026-08-26T10:16:00Z',
-          },
-        ],
-      })
-      setLoading(false)
-    }, 500)
-  }, [params])
+    async function load() {
+      try {
+        const res = await fetch(`/api/cases/${id}`)
+        const data = await res.json()
+
+        if (!res.ok || !data.data) {
+          setError(data.error === 'CASE_NOT_FOUND' ? '事项不存在或已被删除' : data.error || '加载失败')
+          return
+        }
+        setCaseData(data.data)
+      } catch (e) {
+        console.error('Load case failed:', e)
+        setError('网络错误,请重试')
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [id])
 
   if (loading) {
     return (
       <AppLayout title="事项详情">
-        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)' }}>
-          加载中...
+        <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>
+          <span className="spinner" style={{ display: 'inline-block', marginRight: 8 }}></span>
+          正在加载事项...
         </div>
       </AppLayout>
     )
   }
 
-  if (!caseData) {
+  if (error || !caseData) {
     return (
       <AppLayout title="事项详情">
-        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)' }}>
-          Case 不存在
+        <div style={{ padding: 60, textAlign: 'center' }}>
+          <p style={{ color: 'var(--oc-red)', fontSize: 14, marginBottom: 16 }}>{error}</p>
+          <Link href="/">
+            <Button variant="secondary">返回今日工作</Button>
+          </Link>
         </div>
       </AppLayout>
     )
   }
+
+  const statusInfo = STATUS_LABELS[caseData.status] || { label: caseData.status, variant: 'gray' as const }
 
   return (
     <AppLayout title="事项详情">
+      {/* 页头 */}
       <div style={{ marginBottom: 24 }}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            marginBottom: 8,
-          }}
-        >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
           <Badge variant="gray">{caseData.caseNumber}</Badge>
-          <Badge
-            variant={
-              caseData.status === 'OPEN'
-                ? 'blue'
-                : caseData.status === 'IN_PROGRESS'
-                ? 'orange'
-                : caseData.status === 'RESOLVED'
-                ? 'green'
-                : 'gray'
-            }
-          >
-            {caseData.status === 'OPEN'
-              ? '待处理'
-              : caseData.status === 'IN_PROGRESS'
-              ? '处理中'
-              : caseData.status === 'RESOLVED'
-              ? '已解决'
-              : caseData.status}
-          </Badge>
+          <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
+          <Badge variant="gray">v{caseData.version}</Badge>
         </div>
-        <h2
-          style={{
-            fontSize: 25,
-            letterSpacing: -0.035,
-            marginBottom: 4,
-          }}
-        >
+        <h2 style={{ fontSize: 25, letterSpacing: '-0.035em', marginBottom: 4 }}>
           {caseData.title}
         </h2>
         <p style={{ color: 'var(--text-3)', fontSize: 12 }}>
-          {caseData.sources.length} 条居民反馈已关联到同一事项。
+          {caseData.sources.length} 条居民反馈已关联 · 创建于{' '}
+          {new Date(caseData.createdAt).toLocaleDateString('zh-CN')}
         </p>
       </div>
 
@@ -157,14 +142,8 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
         <div className="detail-card">
           <div className="detail-section">
             <h3>事项摘要</h3>
-            <p
-              style={{
-                fontSize: 11,
-                color: 'var(--text-2)',
-                lineHeight: 1.65,
-              }}
-            >
-              {caseData.summary}
+            <p style={{ fontSize: 11, color: 'var(--text-2)', lineHeight: 1.65 }}>
+              {caseData.summary || '暂无摘要'}
             </p>
           </div>
 
@@ -188,7 +167,11 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
               </div>
               <div className="meta-item">
                 <label>类别</label>
-                <div>{caseData.categoryCode || '-'}</div>
+                <div>
+                  {caseData.categoryCode
+                    ? CATEGORY_LABELS[caseData.categoryCode] || caseData.categoryCode
+                    : '未分类'}
+                </div>
               </div>
               <div className="meta-item">
                 <label>地点</label>
@@ -196,58 +179,71 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
               </div>
               <div className="meta-item">
                 <label>负责人</label>
-                <div>{caseData.assigneeId ? '物业协调' : '待分派'}</div>
+                <div>{caseData.assigneeId ? `用户 ${caseData.assigneeId.slice(0, 8)}…` : '待分派'}</div>
               </div>
             </div>
           </div>
 
           <div className="detail-section">
             <h3>居民来源 · {caseData.sources.length}</h3>
-            {caseData.sources.map((source, idx) => (
-              <div key={idx} className="source">
-                <p>"{source.intake.rawText}"</p>
-                <small>
-                  {new Date(source.intake.createdAt).toLocaleDateString('zh-CN')} · 已脱敏文本
-                </small>
-              </div>
-            ))}
+            {caseData.sources.length === 0 ? (
+              <p style={{ fontSize: 10, color: 'var(--text-3)', padding: '12px 0' }}>
+                暂无关联的居民反馈 (此 Case 由人工直接创建)
+              </p>
+            ) : (
+              caseData.sources.map((source) => (
+                <div key={source.id} className="source">
+                  <p>"{source.intake?.rawText || '(无文字内容)'}"</p>
+                  <small>
+                    {new Date(source.createdAt).toLocaleDateString('zh-CN', {
+                      month: '2-digit',
+                      day: '2-digit',
+                    })}{' '}
+                    · 已脱敏文本 · 来自反馈 #{source.issueIndex + 1}
+                  </small>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
-        {/* 右侧: Activity + AI 建议 */}
+        {/* 右侧: Timeline + AI 建议 */}
         <div className="detail-card">
           <div className="detail-section">
             <h3>Activity</h3>
-            <div className="timeline">
-              {caseData.actions.map((action, idx) => (
-                <div key={idx} className="event">
-                  <span className="event-dot"></span>
-                  <div>
-                    <b>
-                      {action.action === 'STATUS_CHANGE'
-                        ? '状态变更'
-                        : action.action === 'ASSIGN'
-                        ? '负责人调整'
-                        : '操作'}
-                    </b>
-                    <small>
-                      {new Date(action.createdAt).toLocaleString('zh-CN', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </small>
-                    {action.fromValue && action.toValue && (
-                      <p>
-                        {action.fromValue} → {action.toValue}
-                      </p>
-                    )}
-                    {action.note && <p>{action.note}</p>}
+            {caseData.timeline.length === 0 ? (
+              <p style={{ fontSize: 10, color: 'var(--text-3)', padding: '8px 0' }}>
+                暂无操作记录
+              </p>
+            ) : (
+              <div className="timeline">
+                {caseData.timeline.map((event) => (
+                  <div key={event.id} className="event">
+                    <span className="event-dot"></span>
+                    <div>
+                      <b>{event.title}</b>
+                      <small>
+                        {new Date(event.createdAt).toLocaleString('zh-CN', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </small>
+                      {event.note ? (
+                        <p>{event.note}</p>
+                      ) : event.fromValue ? (
+                        <p>
+                          {event.fromValue} → {event.toValue}
+                        </p>
+                      ) : (
+                        <p>{event.toValue}</p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="detail-section">
@@ -257,7 +253,9 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
                 <path d="M12 3l2.1 4.8L19 10l-4.9 2.2L12 17l-2.1-4.8L5 10l4.9-2.2z" />
               </svg>
               <span>
-                建议确认具体故障楼层；由于已存在多次反馈,处理完成后可观察是否再次发生。
+                {caseData.sources.length >= 2
+                  ? `该事项已有 ${caseData.sources.length} 条反馈,处理完成后建议观察是否再次发生。`
+                  : '建议跟进居民确认问题是否已解决,再关闭此事项。'}
               </span>
             </div>
           </div>
