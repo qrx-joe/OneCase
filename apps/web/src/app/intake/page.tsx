@@ -8,14 +8,16 @@ import { AppLayout } from '@/components/AppLayout'
 import { Button, Badge } from '@/components'
 
 export default function NewIntakePage() {
+  const router = useRouter()
   const [rawText, setRawText] = useState('')
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<any>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const handleAnalyze = async () => {
     if (!rawText.trim()) return
 
     setLoading(true)
+    setError(null)
     try {
       // 1. 创建 Intake
       const intakeRes = await fetch('/api/intakes', {
@@ -28,19 +30,25 @@ export default function NewIntakePage() {
         }),
       })
       const intakeData = await intakeRes.json()
+      if (!intakeRes.ok || !intakeData.data?.id) {
+        throw new Error(intakeData.error || '创建 Intake 失败')
+      }
       const intakeId = intakeData.data.id
 
-      // 2. 触发 AI 分析
+      // 2. 触发 AI 分析,完成后跳转 Review 页面
       const analyzeRes = await fetch(`/api/intakes/${intakeId}/analyze`, {
         method: 'POST',
       })
       const analyzeData = await analyzeRes.json()
+      if (!analyzeRes.ok || !analyzeData.data?.analysisId) {
+        throw new Error(analyzeData.error || 'AI 分析失败')
+      }
 
-      setResult(analyzeData.data)
-    } catch (error) {
-      console.error('Failed:', error)
-      alert('分析失败,请重试')
-    } finally {
+      // 3. 跳转到 Review 页面 (保留原始输入以便回退)
+      router.push(`/intake/${intakeId}/review`)
+    } catch (e) {
+      console.error('Failed:', e)
+      setError(e instanceof Error ? e.message : '分析失败,请重试')
       setLoading(false)
     }
   }
@@ -130,8 +138,8 @@ export default function NewIntakePage() {
 
       {/* 操作栏 */}
       <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'flex-end' }}>
-        <Button variant="secondary" onClick={() => setResult(null)}>
-          取消
+        <Button variant="secondary" onClick={() => setRawText('')}>
+          清空
         </Button>
         <Button
           variant="primary"
@@ -171,112 +179,25 @@ export default function NewIntakePage() {
         </div>
       )}
 
-      {/* AI Draft 结果 */}
-      {result && !loading && (
-        <div style={{ marginTop: 24 }}>
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <h2 style={{ fontSize: 22, fontWeight: 600, letterSpacing: -0.02 }}>
-                AI 草稿 · 待确认
-              </h2>
-              <Badge variant="purple">AI 建议</Badge>
-            </div>
-            <p style={{ color: 'var(--text-3)', fontSize: 12 }}>
-              识别到 {result.issues?.length || 0} 个潜在事项，需要人工确认。
-            </p>
-          </div>
-
-          <div className="review-layout">
-            <div style={{ display: 'grid', gap: 12 }}>
-              {result.issues?.map((issue: any, idx: number) => (
-                <div key={idx} className="draft-card">
-                  <div className="draft-head">
-                    <h3>事项 {idx + 1} / {result.issues.length}</h3>
-                    <div className="ai-label">
-                      <span className="ai-spark">✦</span>
-                      AI 草稿 · 未写入 Case
-                    </div>
-                  </div>
-                  <div className="draft-body">
-                    <div className="draft-fields">
-                      <div className="draft-field full">
-                        <label>标题</label>
-                        <strong>{issue.title}</strong>
-                      </div>
-                      <div className="draft-field">
-                        <label>类别</label>
-                        <strong>{issue.categoryCode || '未识别'}</strong>
-                      </div>
-                      <div className="draft-field">
-                        <label>地点</label>
-                        <strong>{issue.locationText || '未知'}</strong>
-                      </div>
-                      <div className="draft-field">
-                        <label>影响</label>
-                        <strong>{issue.impact || '未知'}</strong>
-                      </div>
-                      <div className="draft-field">
-                        <label>建议优先级</label>
-                        <strong
-                          style={{
-                            color:
-                              issue.suggestedPriority === 'P1'
-                                ? 'var(--oc-red)'
-                                : issue.suggestedPriority === 'P2'
-                                ? '#C86C00'
-                                : 'inherit',
-                          }}
-                        >
-                          {issue.suggestedPriority || 'UNKNOWN'}
-                        </strong>
-                      </div>
-                    </div>
-
-                    {issue.missingInformation?.length > 0 && (
-                      <div className="missing">
-                        <strong style={{ display: 'block', marginBottom: 4 }}>
-                          缺失信息：
-                        </strong>
-                        {issue.missingInformation.map((info: string, i: number) => (
-                          <div key={i}>• {info}</div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div className="draft-actions">
-                    <Button variant="secondary" size="sm">
-                      编辑
-                    </Button>
-                    <button onClick={() => window.location.href = `/intake/${result.intakeId}/review`}>
-                      <Button variant="primary" size="sm">
-                        确认草稿
-                      </Button>
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Duplicate panel */}
-            <div className="duplicate-card">
-              <div className="dup-head">
-                <h3>相似事项候选</h3>
-                <p>候选仅用于辅助判断，不会自动合并。</p>
-              </div>
-              <div style={{ padding: '13px 15px' }}>
-                <p
-                  style={{
-                    fontSize: 10,
-                    color: 'var(--text-3)',
-                    textAlign: 'center',
-                    padding: '20px 0',
-                  }}
-                >
-                  Demo Mode: 暂无真实相似候选
-                </p>
-              </div>
-            </div>
-          </div>
+      {/* 错误提示 */}
+      {error && !loading && (
+        <div
+          style={{
+            marginTop: 16,
+            padding: '12px 14px',
+            borderRadius: 11,
+            background: 'var(--oc-red-soft)',
+            color: '#C92F27',
+            fontSize: 12,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <span>{error}</span>
+          <Button variant="ghost" size="sm" onClick={handleAnalyze}>
+            重试
+          </Button>
         </div>
       )}
     </AppLayout>
