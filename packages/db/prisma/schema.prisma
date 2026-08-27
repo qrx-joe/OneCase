@@ -1,0 +1,227 @@
+// Prisma Schema for OneCase - v0.1.0 MVP (Simplified)
+// 最后更新: 2026-08-27
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// 组织与用户
+// ============================================================
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([slug])
+}
+
+model User {
+  id             String   @id @default(cuid())
+  organizationId String
+  email          String   @unique
+  name           String
+  role           String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([email])
+}
+
+// ============================================================
+// 分类体系
+// ============================================================
+
+model Category {
+  id             String   @id @default(cuid())
+  organizationId String
+  code           String
+  name           String
+  color          String
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+}
+
+// ============================================================
+// Intake (居民原始信息)
+// ============================================================
+
+model Intake {
+  id             String   @id @default(cuid())
+  organizationId String
+  sourceType     String
+  rawText        String?
+  status         String   @default("PENDING")
+  idempotencyKey String?  @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([idempotencyKey])
+  @@index([createdAt])
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  intakeId  String
+  type      String
+  mimeType  String
+  size      Int
+  url       String
+  createdAt DateTime @default(now())
+
+  @@index([intakeId])
+}
+
+// ============================================================
+// AI Analysis
+// ============================================================
+
+model IntakeAnalysis {
+  id              String   @id @default(cuid())
+  intakeId        String   @unique
+  aiRunId         String?
+  status          String
+  provider        String
+  modelVersion    String
+  promptVersion   String
+  schemaVersion   String
+  latencyMs       Int?
+  tokenUsage      Int?
+  errorMessage    String?
+  createdAt       DateTime @default(now())
+
+  @@index([intakeId])
+}
+
+model IntakeIssue {
+  id              String   @id @default(cuid())
+  analysisId      String
+  issueIndex      Int
+  title           String
+  summary         String?
+  categoryCode    String?
+  locationText    String?
+  impact          String
+  urgency         String
+  affectedGroups  String[]
+  riskSignals     String[]
+  missingInfo     String[]
+  evidenceConflict Boolean @default(false)
+  suggestedPriority String?
+  action          String?
+  confirmedCaseId String?
+
+  @@unique([analysisId, issueIndex])
+  @@index([analysisId])
+}
+
+// ============================================================
+// Case (已确认事项)
+// ============================================================
+
+model Case {
+  id              String   @id @default(cuid())
+  organizationId  String
+  caseNumber      String   @unique
+  title           String
+  summary         String?
+  categoryCode    String?
+  locationText    String?
+  priority        String
+  status          String   @default("OPEN")
+  assigneeId      String?
+  version         Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([caseNumber])
+  @@index([status])
+  @@index([priority])
+}
+
+model CaseSource {
+  id          String   @id @default(cuid())
+  caseId      String
+  intakeId    String
+  issueIndex  Int
+  createdAt   DateTime @default(now())
+
+  @@unique([caseId, intakeId, issueIndex])
+  @@index([caseId])
+  @@index([intakeId])
+}
+
+model CaseAction {
+  id        String   @id @default(cuid())
+  caseId    String
+  userId    String?
+  action    String
+  fromValue String?
+  toValue   String
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([caseId])
+  @@index([createdAt])
+}
+
+// ============================================================
+// AI Run & Embedding
+// ============================================================
+
+model AiRun {
+  id              String   @id @default(cuid())
+  provider        String
+  model           String
+  promptVersion   String
+  schemaVersion   String
+  status          String
+  latencyMs       Int?
+  tokenUsage      Int?
+  errorCategory   String?
+  createdAt       DateTime @default(now())
+}
+
+model CaseEmbedding {
+  id                String   @id @default(cuid())
+  caseId            String   @unique
+  model             String
+  dimension         Int
+  embeddingVersion  String
+  canonicalHash     String
+  embedding         Bytes
+  createdAt         DateTime @default(now())
+
+  @@index([caseId])
+}
+
+// ============================================================
+// Duplicate Candidates
+// ============================================================
+
+model DuplicateCandidate {
+  id              String   @id @default(cuid())
+  caseId          String
+  candidateCaseId String
+  score           Float
+  matchReasons    String[]
+  status          String   @default("PENDING")
+  createdAt       DateTime @default(now())
+
+  @@unique([caseId, candidateCaseId])
+  @@index([caseId])
+}

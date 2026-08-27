@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* OneCase Design Tokens v1.0 */
+:root {
+  /* Brand + semantic colors */
+  --oc-blue: #007AFF;
+  --oc-blue-hover: #0064D6;
+  --oc-blue-soft: rgba(0,122,255,0.10);
+  --oc-green: #34C759;
+  --oc-green-soft: rgba(52,199,89,0.11);
+  --oc-orange: #FF9500;
+  --oc-orange-soft: rgba(255,149,0,0.11);
+  --oc-red: #FF3B30;
+  --oc-red-soft: rgba(255,59,48,0.10);
+  --oc-purple: #5856D6;
+  --oc-purple-soft: rgba(88,86,214,0.10);
+
+  /* Neutral system */
+  --gray-0: #FFFFFF;
+  --gray-50: #FAFAFC;
+  --gray-100: #F5F5F7;
+  --gray-150: #EFEFF2;
+  --gray-200: #E8E8ED;
+  --gray-300: #D2D2D7;
+  --gray-400: #AEAEB2;
+  --gray-500: #8E8E93;
+  --gray-600: #636366;
+  --gray-700: #48484A;
+  --gray-800: #303033;
+  --gray-900: #1D1D1F;
+
+  /* App tokens */
+  --bg: #F5F5F7;
+  --surface: #FFFFFF;
+  --text: #1D1D1F;
+  --text-2: #636366;
+  --text-3: #8E8E93;
+  --border: #E5E5EA;
+  --focus: rgba(0,122,255,0.22);
+}
+
+body {
+  color: var(--text);
+  background: var(--bg);
+}
