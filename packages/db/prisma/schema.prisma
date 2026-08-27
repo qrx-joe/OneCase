@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -116,9 +116,9 @@ model IntakeIssue {
   locationText    String?
   impact          String
   urgency         String
-  affectedGroups  String[]
-  riskSignals     String[]
-  missingInfo     String[]
+  affectedGroups  String
+  riskSignals     String
+  missingInfo     String
   evidenceConflict Boolean @default(false)
   suggestedPriority String?
   action          String?
@@ -218,7 +218,7 @@ model DuplicateCandidate {
   caseId          String
   candidateCaseId String
   score           Float
-  matchReasons    String[]
+  matchReasons    String
   status          String   @default("PENDING")
   createdAt       DateTime @default(now())
 

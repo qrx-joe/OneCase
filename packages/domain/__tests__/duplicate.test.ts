@@ -51,7 +51,7 @@ describe('Duplicate Detection', () => {
         { caseId: '5', score: 0.5, matchReasons: [] },
       ]
 
-      const top3 = selectTopCandidates(candidates, 3)
+      const top3 = selectTopCandidates(candidates as any, 3)
       expect(top3).toHaveLength(3)
       expect(top3[0].caseId).toBe('1')
       expect(top3[2].caseId).toBe('3')
@@ -63,7 +63,7 @@ describe('Duplicate Detection', () => {
         { caseId: '2', score: 0.2, matchReasons: [] },
       ]
 
-      const top = selectTopCandidates(candidates, 3)
+      const top = selectTopCandidates(candidates as any, 3)
       expect(top).toHaveLength(1)
       expect(top[0].caseId).toBe('1')
     })
