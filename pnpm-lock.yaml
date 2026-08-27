@@ -93,6 +93,9 @@ importers:
       '@onecase/contracts':
         specifier: workspace:*
         version: link:../contracts
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
     devDependencies:
       typescript:
         specifier: ^5.7.0
