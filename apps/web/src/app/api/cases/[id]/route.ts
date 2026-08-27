@@ -1,6 +1,7 @@
 // GET /api/cases/[id] - Case Detail (含 Sources + Timeline)
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { CASE_STATUS_TRANSITIONS, CaseStatus } from '@onecase/domain'
 
 export const dynamic = 'force-dynamic'
 
@@ -77,6 +78,8 @@ export async function GET(
         updatedAt: caseData.updatedAt.toISOString(),
         sources: sourceDetails.filter((s) => s.intake !== null),
         timeline,
+        // 当前状态允许迁移到的目标 (供 UI 只展示合法选项)
+        allowedTransitions: CASE_STATUS_TRANSITIONS[caseData.status as CaseStatus] || [],
       },
     })
   } catch (error) {

@@ -45,6 +45,8 @@ interface CaseDetail {
   updatedAt: string
   sources: SourceDetail[]
   timeline: TimelineEvent[]
+  /** 当前状态允许迁移到的目标状态 (domain 状态机) */
+  allowedTransitions: string[]
 }
 
 const STATUS_LABELS: Record<string, { label: string; variant: 'blue' | 'orange' | 'green' | 'gray' }> = {
@@ -187,11 +189,16 @@ export default function CaseDetailPage() {
             onChange={(e) => handleStatusChange(e.target.value)}
             aria-label="变更状态"
           >
-            {Object.entries(STATUS_LABELS).map(([value, { label }]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
+            {/* 当前状态 + 合法迁移目标 (非法迁移在 UI 层就不可选) */}
+            {[caseData.status, ...caseData.allowedTransitions.filter((s) => s !== caseData.status)]
+              .filter((s) => STATUS_LABELS[s])
+              .map((value) => (
+                <option key={value} value={value}>
+                  {value === caseData.status
+                    ? STATUS_LABELS[value].label
+                    : `→ ${STATUS_LABELS[value].label}`}
+                </option>
+              ))}
           </select>
         </div>
       </div>
