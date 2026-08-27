@@ -1,4 +1,5 @@
 // components/index.ts
+export { AppLayout } from './AppLayout'
 export { Button } from './Button'
 export { Badge } from './Badge'
 export { AIDraftCard } from './AIDraftCard'
