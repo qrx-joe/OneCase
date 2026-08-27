@@ -47,7 +47,17 @@ export async function POST(
       data: result.issues.map((issue, index) => ({
         analysisId: analysis.id,
         issueIndex: index,
-        ...issue,
+        title: issue.title,
+        summary: issue.summary || null,
+        categoryCode: issue.categoryCode || null,
+        locationText: issue.locationText || null,
+        impact: issue.impact,
+        urgency: issue.urgency,
+        affectedGroups: JSON.stringify(issue.affectedGroups || []),
+        riskSignals: JSON.stringify(issue.riskSignals || []),
+        missingInfo: JSON.stringify(issue.missingInformation || []),
+        evidenceConflict: issue.evidenceConflict || false,
+        suggestedPriority: issue.suggestedPriority || null,
       })),
     })
 

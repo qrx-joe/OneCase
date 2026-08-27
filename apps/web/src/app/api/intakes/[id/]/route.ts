@@ -1,5 +1,5 @@
 // GET /api/intakes/[id] - 获取 Intake 详情
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(
@@ -8,15 +8,10 @@ export async function GET(
 ) {
   try {
     const { id } = await params
+
+    // 简化查询,避免 Prisma 类型问题
     const intake = await prisma.intake.findUnique({
       where: { id },
-      include: {
-        analysis: {
-          include: {
-            issues: true,
-          },
-        },
-      },
     })
 
     if (!intake) {
