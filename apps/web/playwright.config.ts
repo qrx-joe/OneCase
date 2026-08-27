@@ -9,9 +9,8 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: 'http://localhost:3002', // Dev Server 使用 3002
     trace: 'on-first-retry',
-    // 使用已安装的 Chromium 1223
     launchOptions: {
       executablePath: 'C:\\Users\\14536\\AppData\\Local\\ms-playwright\\chromium-1223\\chrome-win64\\chrome.exe',
     },
@@ -22,11 +21,10 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  // 开发服务器配置
   webServer: {
     command: 'pnpm --filter @onecase/web dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: true,
+    url: 'http://localhost:3002',
+    reuseExistingServer: true, // 使用已运行的服务器
     timeout: 120 * 1000,
   },
 })
