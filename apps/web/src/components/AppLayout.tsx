@@ -25,7 +25,6 @@ export function AppLayout({ children, title }: AppLayoutProps) {
           <path d="M9 20v-6h6v6" />
         </svg>
       ),
-      count: 12,
     },
     {
       href: '/intake',
@@ -35,17 +34,6 @@ export function AppLayout({ children, title }: AppLayoutProps) {
           <path d="M12 5v14M5 12h14" />
         </svg>
       ),
-    },
-    {
-      href: '/review',
-      label: '待确认',
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M4 5h16v14H4z" />
-          <path d="M8 9h8M8 13h5" />
-        </svg>
-      ),
-      count: 4,
     },
     {
       href: '/cases',
@@ -90,22 +78,8 @@ export function AppLayout({ children, title }: AppLayoutProps) {
           ))}
         </nav>
 
-        <div className="sidebar-caption">管理</div>
-        <nav className="sidebar-nav">
-          <Link href="/dashboard" className="sidebar-item">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M4 19V9M10 19V5M16 19v-7M22 19V3" />
-            </svg>
-            数据概览
-          </Link>
-          <Link href="/settings" className="sidebar-item">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.97 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15.03 1.7 1.7 0 0 0 3.08 14H3v-4h.08A1.7 1.7 0 0 0 4.6 8.97a1.7 1.7 0 0 0-.34-1.88L4.2 7.03 7.03 4.2l.06.06A1.7 1.7 0 0 0 8.97 4.6 1.7 1.7 0 0 0 10 3.08V3h4v.08a1.7 1.7 0 0 0 1.03 1.52 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06a1.7 1.7 0 0 0 .34 1.88A1.7 1.7 0 0 0 20.92 10H21v4h-.08A1.7 1.7 0 0 0 19.4 15z" />
-            </svg>
-            设置
-          </Link>
-        </nav>
+        {/* 管理: 数据概览/设置页面未实现,Phase 4 后续补充时恢复
+        <div className="sidebar-caption">管理</div> */}
 
         <div className="sidebar-bottom">
           <div className="user-card">

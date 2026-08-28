@@ -1,8 +1,8 @@
 # OneCase - 社区事项 AI 工作台
 
-**版本**: v0.1 MVP Baseline  
-**状态**: 72h Hackathon Demo  
-**更新日期**: 2026-08-27
+**版本**: v0.1 MVP
+**状态**: 黄金链路已闭环 (可演示)
+**更新**: 2026-08-28
 
 ---
 
@@ -10,23 +10,88 @@
 
 OneCase 是面向社区工作人员的 AI Intake & Case Management Layer。
 
-**核心价值**: 把分散的居民反馈（微信文字、截图、图片）转化为可确认、可关联、可跟踪的社区事项。
-
 **核心判断**:
 ```
 Message != Case
 AI Draft != Business Fact
 ```
 
-**黄金链路**:
+**黄金链路** (已全部实现并验证):
 ```
-Resident Intake
-→ AI Eventization
-→ 1..N Case Drafts
-→ Duplicate Candidates
-→ Human Review
-→ Create or Link Case
-→ Case Workflow / Timeline / Dashboard
+居民反馈 → AI 结构化提取 (1..N 草稿)
+→ Duplicate 候选 (含 Hard Negative 保护,Top3+匹配依据)
+→ 人工确认: 关联已有 Case / 创建新 Case (原子事务+幂等)
+→ Case Detail (居民来源 + Activity Timeline)
+→ 状态流转 (状态机校验 + 乐观锁 + 合法迁移下拉)
+→ Dashboard 真实统计 (只计已确认 Case)
+```
+
+---
+
+## 快速开始
+
+### 环境要求
+
+- Node.js >= 18
+- pnpm >= 8
+
+### 运行
+
+```bash
+# 1. 安装依赖
+pnpm install
+
+# 2. 初始化数据库 + Demo 数据 (SQLite,无需外部服务)
+pnpm --filter @onecase/db db:push     # 建表
+pnpm --filter @onecase/db db:seed     # 灌入 6 Case / 8 Intake
+
+# 3. 启动
+pnpm --filter @onecase/web dev
+# → http://localhost:3000
+```
+
+### 演示前重置
+
+演示或测试污染数据后一键恢复:
+
+```bash
+pnpm --filter @onecase/db db:reset    # 清空业务表 + 重新 seed
+```
+
+---
+
+## 演示流程 (90 秒)
+
+| 步骤 | 操作 | 预期 |
+|------|------|------|
+| 1 | 首页 | KPI 为真实统计 (待处理 2 / 处理中 3 / 高优先级 3) |
+| 2 | 点"＋ 新建 Intake" | 进入输入页 |
+| 3 | 粘贴: `王主任,我们三栋二单元那个灯又坏了,我妈昨天晚上回来差点摔倒。另外楼下垃圾今天也没人清。` | — |
+| 4 | 点"AI 整理为事项" | 步骤化 Processing 动画 → 跳转 Review |
+| 5 | Review 页 | **2 个 AI 草稿** (照明 P2 / 垃圾 P3),紫色"AI 草稿·未写入 Case"标识 |
+| 6 | 看右侧候选 | **CASE-018 (1.00, 地点一致/类别一致) 首位**;CASE-011 标注"位置不同" (Hard Negative) |
+| 7 | 事项 1 点"关联此 Case" | 决策区显示"✓ 将关联 CASE-018" |
+| 8 | 事项 2 点"创建新 Case" | — |
+| 9 | 点"确认全部决策" | 弹出结果: 关联 1 + 创建 1 |
+| 10 | 打开 `/cases/CASE-018` | 居民来源 +1,Timeline 出现关联审计 |
+| 11 | 状态下拉选"→ 已解决" | Badge 更新,Timeline 追加状态变更 |
+| 12 | 回首页 | KPI 数字联动变化 |
+
+**核心卖点演示**: `1 Intake → 2 Issues` (拆分) + `多 Intake → 1 Case` (关联) — 步骤 5-9 一次展示。
+
+---
+
+## 测试
+
+```bash
+pnpm --filter @onecase/domain test   # Domain 33/33 (状态机/优先级/评分)
+pnpm --filter @onecase/ai test       # AI 19/19 (Mock/Qwen/OpenAI/Contract)
+
+# 端到端 (需 Dev Server 运行在 3000)
+node apps/web/scripts/test-golden-path.mjs    # 黄金链路 (创建→分析→确认)
+node apps/web/scripts/test-status-change.mjs  # 状态变更 6 场景 (含非法迁移/版本冲突)
+
+pnpm --filter @onecase/web build     # 构建验证
 ```
 
 ---
@@ -34,165 +99,42 @@ Resident Intake
 ## 项目结构
 
 ```
-onecase/
-├── apps/
-│   ├── web/              # Next.js Web 应用 (主入口)
-│   └── worker/           # AI 异步任务 Worker (待后续)
-├── packages/
-│   ├── domain/           # 纯业务逻辑 (Case/Intake/Duplicate/Priority)
-│   ├── db/               # Prisma Schema + Migrations
-│   ├── ai/               # Provider Abstraction + MockProvider
-│   ├── contracts/        # Zod Schemas + Type Guards
-│   └── ui/               # 共享组件库
-├── docs/
-│   ├── product/          # PRD.md
-│   ├── architecture/     # TECH_SPEC.md
-│   └── adr/              # Architecture Decision Records
-├── README.md             # 本文件
-├── .env.example          # 环境变量模板
-├── package.json          # 工作区根配置
-└── pnpm-workspace.yaml   # pnpm workspace 配置
+packages/
+  domain/     纯业务逻辑 (状态机/优先级/评分) — 无框架依赖
+  contracts/  Zod Schemas
+  ai/         Provider 抽象 + Mock/Qwen/OpenAI + Factory
+  db/         Prisma Schema (SQLite) + seed + reset
+apps/web/
+  src/app/
+    api/        intakes(创建/分析/确认) cases(列表/详情/状态) duplicates dashboard
+    page.tsx    今日工作 (Dashboard)
+    intake/     新建 + Review (决策页)
+    cases/      列表 + Detail
+  src/lib/     prisma / ai-provider / duplicate-service /
+              confirm-intake-service / demo-context
+  src/components/  AppLayout / Button / Badge / ...
+  scripts/     端到端测试脚本
+docs/
+  product/PRD.md  architecture/TECH_SPEC.md  adr/
 ```
 
-**单 App 模式**: 72h 单人开发时,先使用单个 Next.js app + 内部模块边界,不为目录形式机械拆包。
+## AI Provider
 
----
+`AI_PROVIDER=mock` (默认,断网可用)。Qwen/OpenAI 已实现 (packages/ai),接入时设 `QWEN_API_KEY` 并改工厂配置 — 业务层只依赖 `ExtractionProvider` 接口,切换无侵入。
 
-## 快速开始
+## 关键约束 (实现于代码中)
 
-### 前置要求
+1. AI 只生成 Draft;创建/关联/状态变更全部人工触发
+2. 未知字段保持 null/UNKNOWN (缺失信息橙色提示,不猜测)
+3. Duplicate 仅 Top3 候选 + 匹配依据,不自动合并 (评分未校准已标注)
+4. Confirm 为原子事务;重复提交被拒 (INTAKE_ALREADY_CONFIRMED)
+5. 状态迁移由 domain 状态机校验,UI 下拉与 API 校验同源
+6. Dashboard 只统计已确认 Case
 
-- Node.js >= 18 (当前: v24.13.0)
-- pnpm >= 8 (建议最新)
-- PostgreSQL >= 15 (本地开发)
-- Git
+## 已知限制 (试点前需补)
 
-### 初始化项目
-
-```bash
-# 1. 安装依赖 (工作区)
-pnpm install
-
-# 2. 配置环境变量
-cp .env.example .env
-# 编辑 .env 填入实际值 (本地开发可保持默认)
-
-# 3. 初始化数据库
-pnpm db:push
-
-# 4. 启动开发服务器
-pnpm dev
-```
-
-访问 http://localhost:3000
-
----
-
-## 核心命令
-
-```bash
-# 开发
-pnpm dev              # 启动所有工作区服务
-pnpm dev:web          # 仅启动 Web 应用
-pnpm db:studio        # Prisma Studio 数据库可视化
-
-# 构建
-pnpm build            # 构建所有工作区
-pnpm lint             # 运行 ESLint
-pnpm typecheck        # TypeScript 类型检查
-pnpm test             # 运行单元测试
-
-# E2E
-pnpm test:e2e         # 运行 Playwright 测试
-pnpm test:e2e:ui      # Playwright UI 模式
-```
-
-**详细文档**: [docs/architecture/TECH_SPEC.md](docs/architecture/TECH_SPEC.md) | [docs/product/PRD.md](docs/product/PRD.md)
-
----
-
-## Demo 模式
-
-设置环境变量启用 Demo Mode:
-```bash
-DEMO_MODE=true pnpm dev
-```
-
-**Demo 特性**:
-- 预置合成数据 (Demo Data 标识)
-- MockProvider (断网/无 API Key 可运行)
-- Demo Reset (仅 Demo Mode 可用)
-
-**黄金链路演示**:
-```
-1. 新建 Intake: "三栋二单元那个灯又坏了,垃圾也没人清"
-2. AI 识别: 2 个独立事项 (楼道照明 + 垃圾清运)
-3. 重复检测: 发现相似 CASE-018 (楼道照明)
-4. 人工确认: 关联 CASE-018 + 创建新垃圾清运 Case
-5. 查看 Timeline: 居民反馈 → 关联已有事项
-```
-
----
-
-## 技术栈
-
-| 层级 | 技术选型 | 备注 |
-|------|---------|------|
-| Web 框架 | Next.js 14+ (App Router) | TypeScript 默认 |
-| UI | Tailwind CSS + Shadcn/ui | Apple 风格设计系统 |
-| Database | PostgreSQL + pgvector | MVP 不使用独立 Vector DB |
-| ORM | Prisma (待最终确认) | 或 Drizzle |
-| 验证 | Zod | 所有外部输入 |
-| 测试 | Vitest + Playwright | Unit + Integration + E2E |
-| AI | Provider Abstraction + MockProvider | 先 Mock 后真实 |
-
----
-
-## 设计规范
-
-**视觉方向**: Apple 风格 + B2B 工作台密度
-- 轻灰工作区 + 白色内容面
-- 系统蓝 `#007AFF` 唯一主操作色
-- 风险色只用于真实风险
-- 动效: 150ms 微交互 / 240ms 状态切换 / 380ms 反馈
-
-**详细设计文档**: [设计视觉规范 v1.0](D:\EdgeDownload\preview (2).html)
-
----
-
-## 开发流程
-
-### Phase 当前状态
-- ✅ Phase 0: 固化基线 (进行中)
-- ⏸ Phase 1: Domain First (待开始)
-- ⏸ Phase 2: Mock 黄金链路 (待开始)
-- ⏸ Phase 3: 真实 AI 与重复检测 (待开始)
-- ⏸ Phase 4: Demo 就绪 (待开始)
-
-详见 [TASK.md](TASK.md)
-
----
-
-## 关键约束 (必须遵守)
-
-1. **AI 只能生成 Draft**,创建/关联/关闭 Case 必须由用户触发
-2. **未知字段保持 null/UNKNOWN**,不自动补齐猜测
-3. **Demo 数据必须明确标记**,不声称未验证的效率/准确率
-4. **不提交密钥/真实居民数据/Token**
-5. **不使用 pnpm workspace 时,先删掉 pnpm-workspace.yaml**
-
----
-
-## 贡献指南
-
-当前阶段为个人 MVP 开发,不接受外部贡献。
-
----
-
-## 许可证
-
-MIT (待确认)
-
----
-
-**核心理念**: 让工作人员在 3 秒内知道——发生了什么、什么最急、下一步做什么。
+- 认证/RBAC/租户硬隔离未实现 (organizationId 仅过滤,未校验归属)
+- Case 编号 `count()+1` 并发可重号 → 改序列
+- Embedding 重复检测未接 (当前为标题/地点/类别启发式)
+- SQLite → PostgreSQL 迁移
+- webpack 缓存损坏: 改 lib 文件后热重载可能 500,重启 `pnpm dev` 即恢复
