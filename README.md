@@ -85,11 +85,15 @@ pnpm --filter @onecase/db db:reset    # 清空业务表 + 重新 seed
 
 ```bash
 pnpm --filter @onecase/domain test   # Domain 33/33 (状态机/优先级/评分)
-pnpm --filter @onecase/ai test       # AI 19/19 (Mock/Qwen/OpenAI/Contract)
+pnpm --filter @onecase/ai test       # AI 26/26 (Mock/Qwen/OpenAI/Contract/超时/重试)
 
-# 端到端 (需 Dev Server 运行在 3000)
-node apps/web/scripts/test-golden-path.mjs    # 黄金链路 (创建→分析→确认)
+# 端到端 (需 Dev Server 运行在 3000,脚本需先 db:reset)
+node apps/web/scripts/test-golden-path.mjs    # 黄金链路 (创建→分析→确认,一关联一新建+幂等)
 node apps/web/scripts/test-status-change.mjs  # 状态变更 6 场景 (含非法迁移/版本冲突)
+node apps/web/scripts/test-manual-create.mjs  # 手动创建 Case (AI 失败兜底,关联回原始 Intake)
+
+# Playwright UI 链路 (自动 db:reset,用例间隔离)
+pnpm --filter @onecase/web test:e2e           # 黄金链路 + 草稿编辑
 
 pnpm --filter @onecase/web build     # 构建验证
 ```
@@ -125,11 +129,13 @@ docs/
 ## 关键约束 (实现于代码中)
 
 1. AI 只生成 Draft;创建/关联/状态变更全部人工触发
-2. 未知字段保持 null/UNKNOWN (缺失信息橙色提示,不猜测)
-3. Duplicate 仅 Top3 候选 + 匹配依据,不自动合并 (评分未校准已标注)
-4. Confirm 为原子事务;重复提交被拒 (INTAKE_ALREADY_CONFIRMED)
-5. 状态迁移由 domain 状态机校验,UI 下拉与 API 校验同源
-6. Dashboard 只统计已确认 Case
+2. 草稿可编辑: Review 页标题/地点/优先级可人工修改,确认后以人工值为准并留审计 (AI 原值保留在 IntakeIssue)
+3. AI 失败可兜底: 重试不重复建档;可转 `/cases/new` 手动创建,原始反馈自动关联为居民来源
+4. 未知字段保持 null/UNKNOWN (缺失信息橙色提示,不猜测)
+5. Duplicate 仅 Top3 候选 + 匹配依据,不自动合并 (评分未校准已标注)
+6. Confirm 为原子事务;重复提交被拒 (INTAKE_ALREADY_CONFIRMED)
+7. 状态迁移由 domain 状态机校验,UI 下拉与 API 校验同源
+8. Dashboard 只统计已确认 Case
 
 ## 已知限制 (试点前需补)
 
@@ -137,4 +143,4 @@ docs/
 - Case 编号 `count()+1` 并发可重号 → 改序列
 - Embedding 重复检测未接 (当前为标题/地点/类别启发式)
 - SQLite → PostgreSQL 迁移
-- webpack 缓存损坏: 改 lib 文件后热重载可能 500,重启 `pnpm dev` 即恢复
+- webpack 缓存损坏: 改 lib 文件后热重载可能 500,重启 `pnpm dev` 即恢复;`next build` 与运行中的 dev server 共写 `.next`,build 后建议重启 dev

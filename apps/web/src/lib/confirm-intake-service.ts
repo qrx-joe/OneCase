@@ -1,9 +1,11 @@
 // lib/confirm-intake-service.ts
 // Confirm Transaction: 原子性 Create Case / Link Existing Case
+// 草稿可编辑: 人工对 AI 草稿字段的修改随决策提交,仅对 CREATE_CASE 生效 (TASK.md: AI 结果可编辑)
 'use server'
 
 import { prisma } from '@/lib/prisma'
 import { calculatePriority } from '@onecase/domain'
+import { generateCaseNumber } from '@/lib/case-number'
 
 export interface ConfirmIntakeParams {
   intakeId: string
@@ -13,6 +15,12 @@ export interface ConfirmIntakeParams {
     issueIndex: number
     decision: 'CREATE_CASE' | 'LINK_EXISTING' | 'REJECTED'
     targetCaseId?: string
+    /** 人工编辑后的草稿字段;缺省字段沿用 AI 原值 */
+    edit?: {
+      title?: string
+      locationText?: string
+      suggestedPriority?: 'P1' | 'P2' | 'P3' | 'UNKNOWN'
+    }
   }>
 }
 
@@ -88,26 +96,61 @@ export async function confirmIntake(params: ConfirmIntakeParams): Promise<Confir
         }
 
         if (decision.decision === 'CREATE_CASE') {
+          // 人工编辑校验与归一化 (title 提供时不得为空;优先级必须合法)
+          const edit = decision.edit || {}
+          const VALID_PRIORITIES = new Set(['P1', 'P2', 'P3', 'UNKNOWN'])
+
+          let editedTitle: string | undefined
+          if (edit.title !== undefined) {
+            editedTitle = edit.title.trim()
+            if (!editedTitle) throw new Error('EDIT_TITLE_EMPTY')
+            if (editedTitle.length > 200) throw new Error('EDIT_TITLE_TOO_LONG')
+          }
+          const editedLocation =
+            edit.locationText !== undefined ? edit.locationText.trim() : undefined
+          if (
+            edit.suggestedPriority !== undefined &&
+            !VALID_PRIORITIES.has(edit.suggestedPriority)
+          ) {
+            throw new Error('INVALID_EDIT_PRIORITY')
+          }
+
           // 创建新 Case
-          const count = await tx.case.count()
-          const caseNumber = `CASE-${String(1000 + count + 1).padStart(3, '0')}`
+          const caseNumber = await generateCaseNumber(tx)
 
           const impact = (issue.impact || 'UNKNOWN') as 'LOW' | 'MEDIUM' | 'HIGH' | 'UNKNOWN'
           const urgency = (issue.urgency || 'UNKNOWN') as 'LOW' | 'MEDIUM' | 'HIGH' | 'UNKNOWN'
-          const priority = issue.suggestedPriority || calculatePriority(impact, urgency)
+          const priority =
+            edit.suggestedPriority || issue.suggestedPriority || calculatePriority(impact, urgency)
+          const finalLocation =
+            editedLocation !== undefined
+              ? editedLocation || undefined
+              : issue.locationText || undefined
 
           const newCase = await tx.case.create({
             data: {
               organizationId: intake.organizationId,
               caseNumber,
-              title: issue.title,
+              title: editedTitle ?? issue.title,
               summary: issue.summary || undefined,
               categoryCode: issue.categoryCode || undefined,
-              locationText: issue.locationText || undefined,
+              locationText: finalLocation,
               priority,
               status: 'OPEN',
             },
           })
+
+          // 审计: 记录人工相对 AI 草稿的修改 (AI 原值保留在 IntakeIssue,可追溯)
+          const editedNotes: string[] = []
+          if (editedTitle !== undefined && editedTitle !== issue.title) {
+            editedNotes.push(`标题「${issue.title}」→「${editedTitle}」`)
+          }
+          if (editedLocation !== undefined && editedLocation !== (issue.locationText || '')) {
+            editedNotes.push(`地点「${issue.locationText || '(空)'}」→「${editedLocation || '(空)'}」`)
+          }
+          if (edit.suggestedPriority && edit.suggestedPriority !== issue.suggestedPriority) {
+            editedNotes.push(`优先级 ${issue.suggestedPriority || '(空)'} → ${edit.suggestedPriority}`)
+          }
 
           // 创建 CaseSource
           await tx.caseSource.create({
@@ -125,7 +168,9 @@ export async function confirmIntake(params: ConfirmIntakeParams): Promise<Confir
               userId,
               action: 'NOTE',
               toValue: 'Case 创建',
-              note: `来源: Intake ${intakeId}, Issue #${decision.issueIndex}`,
+              note:
+                `来源: Intake ${intakeId}, Issue #${decision.issueIndex}` +
+                (editedNotes.length ? `;人工调整: ${editedNotes.join('; ')}` : ''),
             },
           })
 

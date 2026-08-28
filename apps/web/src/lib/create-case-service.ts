@@ -1,0 +1,121 @@
+// lib/create-case-service.ts
+// 手动创建 Case: AI 不可用时的兜底路径 (TASK.md: 异常情况下仍可手动创建 Case)
+// 可选 sourceIntakeId: 把 AI 失败前已保存的原始 Intake 关联为居民来源,闭环不丢数据
+'use server'
+
+import { prisma } from '@/lib/prisma'
+import { resolveOrgId } from '@/lib/demo-context'
+import { generateCaseNumber } from '@/lib/case-number'
+
+export interface CreateCaseParams {
+  title: string
+  summary?: string
+  categoryCode?: string
+  locationText?: string
+  priority?: string
+  organizationId?: string
+  /** AI 失败时已创建的 Intake,手动建 Case 后关联回去 */
+  sourceIntakeId?: string
+  userId?: string
+}
+
+export interface CreateCaseResult {
+  success: boolean
+  id?: string
+  caseNumber?: string
+  errors: string[]
+}
+
+const VALID_PRIORITIES = new Set(['P1', 'P2', 'P3', 'UNKNOWN'])
+
+export async function createCaseManually(
+  params: CreateCaseParams
+): Promise<CreateCaseResult> {
+  const result: CreateCaseResult = { success: false, errors: [] }
+
+  const title = params.title?.trim()
+  if (!title) {
+    result.errors.push('TITLE_REQUIRED')
+    return result
+  }
+  if (title.length > 200) {
+    result.errors.push('TITLE_TOO_LONG')
+    return result
+  }
+  const priority = params.priority || 'P2'
+  if (!VALID_PRIORITIES.has(priority)) {
+    result.errors.push(`INVALID_PRIORITY: ${priority}`)
+    return result
+  }
+
+  try {
+    const created = await prisma.$transaction(async (tx) => {
+      const organizationId = await resolveOrgId(params.organizationId)
+      const caseNumber = await generateCaseNumber(tx)
+
+      let sourceIntake: { id: string; status: string } | null = null
+      if (params.sourceIntakeId) {
+        sourceIntake = await tx.intake.findUnique({
+          where: { id: params.sourceIntakeId },
+          select: { id: true, status: true },
+        })
+        if (!sourceIntake) throw new Error('SOURCE_INTAKE_NOT_FOUND')
+        if (sourceIntake.status === 'CONFIRMED') {
+          throw new Error('INTAKE_ALREADY_CONFIRMED')
+        }
+      }
+
+      const newCase = await tx.case.create({
+        data: {
+          organizationId,
+          caseNumber,
+          title,
+          summary: params.summary?.trim() || undefined,
+          categoryCode: params.categoryCode || undefined,
+          locationText: params.locationText?.trim() || undefined,
+          priority,
+          status: 'OPEN',
+        },
+      })
+
+      if (sourceIntake) {
+        await tx.caseSource.create({
+          data: {
+            caseId: newCase.id,
+            intakeId: sourceIntake.id,
+            issueIndex: 0,
+          },
+        })
+      }
+
+      await tx.caseAction.create({
+        data: {
+          caseId: newCase.id,
+          userId: params.userId,
+          action: 'MANUAL_CREATE',
+          toValue: '手动创建',
+          note: sourceIntake
+            ? `AI 不可用,人工创建;来源: Intake ${sourceIntake.id}`
+            : '人工直接创建,未经 AI 分析',
+        },
+      })
+
+      if (sourceIntake) {
+        await tx.intake.update({
+          where: { id: sourceIntake.id },
+          data: { status: 'CONFIRMED' },
+        })
+      }
+
+      return newCase
+    })
+
+    result.success = true
+    result.id = created.id
+    result.caseNumber = created.caseNumber
+  } catch (error) {
+    result.errors.push(error instanceof Error ? error.message : 'Unknown error')
+  }
+
+  return result
+}

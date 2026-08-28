@@ -99,6 +99,8 @@ function formatActionTitle(action: string): string {
       return '负责人调整'
     case 'PRIORITY_CHANGE':
       return '优先级调整'
+    case 'MANUAL_CREATE':
+      return '人工创建'
     case 'NOTE':
       return '备注'
     default:

@@ -3,6 +3,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { AppLayout } from '@/components/AppLayout'
 import { Button, Badge } from '@/components'
 
@@ -113,6 +114,9 @@ export default function CasesPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
+          <Link href="/cases/new">
+            <Button variant="secondary">+ 手动创建</Button>
+          </Link>
         </div>
       </div>
 

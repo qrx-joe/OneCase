@@ -12,6 +12,20 @@ export default function NewIntakePage() {
   const [rawText, setRawText] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // AI 失败前已创建的 Intake: 重试只重跑分析 (不重复建档),也可转手动创建
+  const [createdIntakeId, setCreatedIntakeId] = useState<string | null>(null)
+  const [createdRawText, setCreatedRawText] = useState('')
+
+  const analyzeIntakeById = async (id: string) => {
+    const analyzeRes = await fetch(`/api/intakes/${id}/analyze`, {
+      method: 'POST',
+    })
+    const analyzeData = await analyzeRes.json()
+    if (!analyzeRes.ok || !analyzeData.data?.analysisId) {
+      throw new Error(analyzeData.message || analyzeData.error || 'AI 分析失败')
+    }
+    router.push(`/intake/${id}/review`)
+  }
 
   const handleAnalyze = async () => {
     if (!rawText.trim()) return
@@ -19,33 +33,30 @@ export default function NewIntakePage() {
     setLoading(true)
     setError(null)
     try {
-      // 1. 创建 Intake
-      const intakeRes = await fetch('/api/intakes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          rawText,
-          sourceType: 'text',
-          organizationId: 'demo-org',
-        }),
-      })
-      const intakeData = await intakeRes.json()
-      if (!intakeRes.ok || !intakeData.data?.id) {
-        throw new Error(intakeData.error || '创建 Intake 失败')
-      }
-      const intakeId = intakeData.data.id
-
-      // 2. 触发 AI 分析,完成后跳转 Review 页面
-      const analyzeRes = await fetch(`/api/intakes/${intakeId}/analyze`, {
-        method: 'POST',
-      })
-      const analyzeData = await analyzeRes.json()
-      if (!analyzeRes.ok || !analyzeData.data?.analysisId) {
-        throw new Error(analyzeData.error || 'AI 分析失败')
+      // 复用失败前已创建的 Intake (原始文本未变时),避免重试产生重复建档
+      let id: string
+      if (createdIntakeId && rawText === createdRawText) {
+        id = createdIntakeId
+      } else {
+        const intakeRes = await fetch('/api/intakes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            rawText,
+            sourceType: 'text',
+            organizationId: 'demo-org',
+          }),
+        })
+        const intakeData = await intakeRes.json()
+        if (!intakeRes.ok || !intakeData.data?.id) {
+          throw new Error(intakeData.error || '创建 Intake 失败')
+        }
+        id = intakeData.data.id as string
+        setCreatedIntakeId(id)
+        setCreatedRawText(rawText)
       }
 
-      // 3. 跳转到 Review 页面 (保留原始输入以便回退)
-      router.push(`/intake/${intakeId}/review`)
+      await analyzeIntakeById(id)
     } catch (e) {
       console.error('Failed:', e)
       setError(e instanceof Error ? e.message : '分析失败,请重试')
@@ -179,7 +190,7 @@ export default function NewIntakePage() {
         </div>
       )}
 
-      {/* 错误提示 */}
+      {/* 错误提示: 可重试,也可转手动创建 (原始反馈已保存) */}
       {error && !loading && (
         <div
           style={{
@@ -192,12 +203,27 @@ export default function NewIntakePage() {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            gap: 8,
           }}
         >
-          <span>{error}</span>
-          <Button variant="ghost" size="sm" onClick={handleAnalyze}>
-            重试
-          </Button>
+          <span style={{ flex: 1 }}>
+            {error}
+            {createdIntakeId && ' (原始反馈已保存,不会丢失)'}
+          </span>
+          <div style={{ display: 'flex', gap: 7, flexShrink: 0 }}>
+            <Button variant="ghost" size="sm" onClick={handleAnalyze}>
+              重试
+            </Button>
+            {createdIntakeId && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => router.push(`/cases/new?intakeId=${createdIntakeId}`)}
+              >
+                改为手动创建 Case
+              </Button>
+            )}
+          </div>
         </div>
       )}
     </AppLayout>

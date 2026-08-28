@@ -47,6 +47,8 @@ export default function IntakeReviewPage() {
 
   // 每个 issue 的决策: CREATE_CASE / LINK_EXISTING(带 targetCaseId) / REJECTED
   const [decisions, setDecisions] = useState<Record<number, { decision: Decision; targetCaseId?: string }>>({})
+  // 人工编辑的草稿字段 (只记录改动过的字段,未改动的沿用 AI 原值)
+  const [edits, setEdits] = useState<Record<number, { title?: string; locationText?: string; suggestedPriority?: string }>>({})
 
   useEffect(() => {
     async function load() {
@@ -104,6 +106,16 @@ export default function IntakeReviewPage() {
     }))
   }, [])
 
+  const setEdit = useCallback(
+    (index: number, field: 'title' | 'locationText' | 'suggestedPriority', value: string) => {
+      setEdits((prev) => ({
+        ...prev,
+        [index]: { ...prev[index], [field]: value },
+      }))
+    },
+    []
+  )
+
   const allDecided = issues.length > 0 && issues.every((_, idx) => decisions[idx]?.decision)
 
   const handleSubmit = async () => {
@@ -115,6 +127,8 @@ export default function IntakeReviewPage() {
         issueIndex: idx,
         decision: decisions[idx].decision,
         targetCaseId: decisions[idx].targetCaseId,
+        // 携带人工编辑 (仅改动过的字段);创建新 Case 时以人工值为准
+        ...(edits[idx] ? { edit: edits[idx] } : {}),
       }))
 
       const res = await fetch(`/api/intakes/${intakeId}/confirm`, {
@@ -166,11 +180,16 @@ export default function IntakeReviewPage() {
       <AppLayout title="AI 草稿 · 待确认">
         <div style={{ padding: 40, textAlign: 'center' }}>
           <p style={{ color: 'var(--oc-red)', fontSize: 14, marginBottom: 12 }}>{error}</p>
-          <Button variant="secondary" onClick={() => router.push('/intake')}>
-            返回重新输入
-          </Button>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+            <Button variant="secondary" onClick={() => router.push('/intake')}>
+              返回重新输入
+            </Button>
+            <Button variant="primary" onClick={() => router.push(`/cases/new?intakeId=${intakeId}`)}>
+              改为手动创建 Case
+            </Button>
+          </div>
           <p style={{ color: 'var(--text-3)', fontSize: 11, marginTop: 16 }}>
-            AI 失败时仍可手动创建 Case (手动路径待实现)
+            原始反馈已保存。手动创建后,该反馈会自动关联为居民来源。
           </p>
         </div>
       </AppLayout>
@@ -219,35 +238,49 @@ export default function IntakeReviewPage() {
                 <div className="draft-body">
                   <div className="draft-fields">
                     <div className="draft-field full">
-                      <label>标题</label>
-                      <strong>{issue.title}</strong>
+                      <label htmlFor={`draft-title-${idx}`}>标题 (可编辑)</label>
+                      <input
+                        id={`draft-title-${idx}`}
+                        aria-label="事项标题"
+                        className="field"
+                        maxLength={200}
+                        value={edits[idx]?.title ?? issue.title}
+                        onChange={(e) => setEdit(idx, 'title', e.target.value)}
+                      />
                     </div>
                     <div className="draft-field">
                       <label>类别</label>
                       <strong>{issue.categoryCode || '未识别'}</strong>
                     </div>
                     <div className="draft-field">
-                      <label>地点</label>
-                      <strong>{issue.locationText || '未知'}</strong>
+                      <label htmlFor={`draft-location-${idx}`}>地点 (可编辑)</label>
+                      <input
+                        id={`draft-location-${idx}`}
+                        aria-label="地点"
+                        className="field"
+                        value={edits[idx]?.locationText ?? issue.locationText ?? ''}
+                        onChange={(e) => setEdit(idx, 'locationText', e.target.value)}
+                      />
                     </div>
                     <div className="draft-field">
                       <label>影响</label>
                       <strong>{issue.impact}</strong>
                     </div>
                     <div className="draft-field">
-                      <label>建议优先级</label>
-                      <strong
-                        style={{
-                          color:
-                            issue.suggestedPriority === 'P1'
-                              ? 'var(--oc-red)'
-                              : issue.suggestedPriority === 'P2'
-                              ? '#C86C00'
-                              : 'inherit',
-                        }}
+                      <label htmlFor={`draft-priority-${idx}`}>建议优先级 (可编辑)</label>
+                      <select
+                        id={`draft-priority-${idx}`}
+                        aria-label="建议优先级"
+                        className="field"
+                        value={edits[idx]?.suggestedPriority ?? issue.suggestedPriority ?? 'UNKNOWN'}
+                        onChange={(e) => setEdit(idx, 'suggestedPriority', e.target.value)}
                       >
-                        {issue.suggestedPriority || 'UNKNOWN'}
-                      </strong>
+                        {['P1', 'P2', 'P3', 'UNKNOWN'].map((p) => (
+                          <option key={p} value={p}>
+                            {p}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                     {issue.summary && (
                       <div className="draft-field full">
