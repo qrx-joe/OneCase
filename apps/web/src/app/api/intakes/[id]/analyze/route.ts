@@ -1,7 +1,9 @@
-// POST /api/intakes/[id]/analyze - 触发 AI 分析 (幂等: 已有分析则直接返回)
+// POST /api/intakes/[id]/analyze - 触发 AI 分析
+// 幂等: 已有 COMPLETED 分析直接返回;失败记录 FAILED (可重试,不重复占位)
+// 审计: provider/model/latency 记录真实值,不硬编码 (TASK.md Phase 3)
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { analyzeIntake } from '@/lib/ai-provider'
+import { analyzeIntake, getProviderInfo } from '@/lib/ai-provider'
 
 export async function POST(
   request: NextRequest,
@@ -54,25 +56,80 @@ export async function POST(
       })
     }
 
+    const { provider, modelVersion } = getProviderInfo()
+
     // 更新状态为 ANALYZING
     await prisma.intake.update({
       where: { id },
       data: { status: 'ANALYZING' },
     })
 
-    // 调用 AI Provider (Mock)
-    const result = await analyzeIntake(intake.rawText || '')
+    // 调用 AI Provider (超时/重试/Schema 校验在 provider 层)
+    const startedAt = Date.now()
+    let result
+    try {
+      result = await analyzeIntake(intake.rawText || '')
+    } catch (aiError) {
+      const latencyMs = Date.now() - startedAt
+      const errorMessage =
+        aiError instanceof Error ? aiError.message : 'Unknown AI error'
 
-    // 创建 Analysis
-    const analysis = await prisma.intakeAnalysis.create({
-      data: {
+      // 记录失败分析 (intakeId 唯一约束: upsert 复用行,重试不冲突)
+      await prisma.intakeAnalysis.upsert({
+        where: { intakeId: id },
+        update: {
+          status: 'FAILED',
+          provider,
+          modelVersion,
+          latencyMs,
+          errorMessage,
+        },
+        create: {
+          intakeId: id,
+          provider,
+          modelVersion,
+          promptVersion: 'v1',
+          schemaVersion: 'v1',
+          status: 'FAILED',
+          latencyMs,
+          errorMessage,
+        },
+      })
+      // 回退 Intake 状态,允许重试
+      await prisma.intake.update({
+        where: { id },
+        data: { status: 'PENDING' },
+      })
+
+      console.error('Analyze intake failed:', errorMessage)
+      return NextResponse.json(
+        {
+          error: 'AI_ANALYZE_FAILED',
+          message: `AI 分析失败 (${errorMessage})。可重试,或稍后使用手动创建。`,
+        },
+        { status: 502 }
+      )
+    }
+    const latencyMs = Date.now() - startedAt
+
+    // 创建/复用 Analysis (intakeId 唯一: 之前的 FAILED 行被复用为 COMPLETED)
+    const analysis = await prisma.intakeAnalysis.upsert({
+      where: { intakeId: id },
+      update: {
+        provider,
+        modelVersion,
+        status: 'COMPLETED',
+        latencyMs,
+        errorMessage: null,
+      },
+      create: {
         intakeId: id,
-        provider: 'mock',
-        modelVersion: 'mock-v1',
+        provider,
+        modelVersion,
         promptVersion: 'v1',
         schemaVersion: 'v1',
         status: 'COMPLETED',
-        latencyMs: 100,
+        latencyMs,
       },
     })
 

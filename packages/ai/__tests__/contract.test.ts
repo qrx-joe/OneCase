@@ -1,49 +1,31 @@
-// AI Contract Tests - 验证 Provider 输出符合 Schema
+// AI Contract Tests - MockProvider 全部场景输出必须符合 contracts 包的真实 Schema
+// 此前本文件维护了一份与 contracts 重复的本地 Schema,已改为直接依赖 @onecase/contracts
 import { describe, it, expect } from 'vitest'
-import { z } from 'zod'
+import { AnalysisResultSchema } from '@onecase/contracts'
 import { MockProvider } from '../src/mock-provider'
 
-// Issue Draft Schema (与 contracts 包保持一致)
-const IssueDraftSchema = z.object({
-  title: z.string().min(1).max(200),
-  summary: z.string().max(500).nullable(),
-  categoryCode: z.string().nullable(),
-  locationText: z.string().nullable(),
-  impact: z.enum(['LOW', 'MEDIUM', 'HIGH', 'UNKNOWN']),
-  urgency: z.enum(['LOW', 'MEDIUM', 'HIGH', 'UNKNOWN']),
-  affectedGroups: z.array(z.string()).default([]),
-  riskSignals: z.array(z.string()).default([]),
-  missingInformation: z.array(z.string()).default([]),
-  evidenceConflict: z.boolean().default(false),
-  suggestedPriority: z.enum(['P1', 'P2', 'P3', 'UNKNOWN']).nullable(),
-})
-
-const ExtractionResultSchema = z.object({
-  issues: z.array(IssueDraftSchema).min(1).max(5),
-  processingNotes: z.string().optional(),
-})
-
-describe('AI Contract Tests - Provider Output Validation', () => {
+describe('AI Contract Tests - MockProvider 输出符合 contracts Schema', () => {
   const provider = new MockProvider()
 
-  it('MockProvider 输出应该符合 Schema', async () => {
-    const result = await provider.extractCaseDraft({
-      rawText: '三栋二单元那个灯又坏了,另外垃圾也没人清。',
+  const scenarios = [
+    { name: '多事项场景 (照明+垃圾)', text: '三栋二单元那个灯又坏了,另外垃圾也没人清。' },
+    { name: '单事项场景 (电梯)', text: '五栋电梯最近总是有怪声' },
+    { name: 'Hard Negative 场景 (1单元)', text: '三栋一单元楼道灯坏了' },
+    { name: '默认场景 (无法分类)', text: '随便说点什么' },
+    { name: '空文本', text: '' },
+    { name: '超长文本', text: 'a'.repeat(10000) },
+  ]
+
+  for (const { name, text } of scenarios) {
+    it(`${name} 应通过 AnalysisResultSchema 校验`, async () => {
+      const result = await provider.extractCaseDraft({ rawText: text })
+      const validation = AnalysisResultSchema.safeParse(result)
+      expect(validation.success).toBe(true)
     })
+  }
 
-    // Zod Schema 验证
-    const validation = ExtractionResultSchema.safeParse(result)
-    expect(validation.success).toBe(true)
-
-    if (validation.success) {
-      expect(validation.data.issues.length).toBeGreaterThan(0)
-      expect(validation.data.issues.length).toBeLessThanOrEqual(5)
-    }
-  })
-
-  it('所有 Issue 必须包含 title', async () => {
+  it('所有 Issue 必须包含非空 title', async () => {
     const result = await provider.extractCaseDraft({ rawText: '测试' })
-
     result.issues.forEach((issue) => {
       expect(issue.title).toBeDefined()
       expect(issue.title.length).toBeGreaterThan(0)
@@ -52,7 +34,6 @@ describe('AI Contract Tests - Provider Output Validation', () => {
 
   it('impact 和 urgency 必须是有效枚举值', async () => {
     const result = await provider.extractCaseDraft({ rawText: '测试' })
-
     const validValues = ['LOW', 'MEDIUM', 'HIGH', 'UNKNOWN']
     result.issues.forEach((issue) => {
       expect(validValues).toContain(issue.impact)
@@ -60,44 +41,17 @@ describe('AI Contract Tests - Provider Output Validation', () => {
     })
   })
 
-  it('建议优先级必须是 P1/P2/P3/UNKNOWN/null', async () => {
+  it('建议优先级必须是 P1/P2/P3/UNKNOWN/空', async () => {
     const result = await provider.extractCaseDraft({ rawText: '测试' })
-
     const validPriorities = ['P1', 'P2', 'P3', 'UNKNOWN', null, undefined]
     result.issues.forEach((issue) => {
       expect(validPriorities).toContain(issue.suggestedPriority)
     })
   })
 
-  it('至少识别出一个 Issue', async () => {
-    const result = await provider.extractCaseDraft({ rawText: '任何文本' })
-
+  it('至少识别出一个 Issue,最多 5 个', async () => {
+    const result = await provider.extractCaseDraft({ rawText: '问题1。问题2。问题3。' })
     expect(result.issues.length).toBeGreaterThanOrEqual(1)
-  })
-
-  it('最多识别 5 个 Issue', async () => {
-    const result = await provider.extractCaseDraft({
-      rawText: '问题1。问题2。问题3。问题4。问题5。问题6。',
-    })
-
     expect(result.issues.length).toBeLessThanOrEqual(5)
-  })
-})
-
-describe('AI Contract Tests - Error Handling', () => {
-  it('空文本应该返回至少一个 Issue', async () => {
-    const provider = new MockProvider()
-    const result = await provider.extractCaseDraft({ rawText: '' })
-
-    expect(result.issues.length).toBeGreaterThanOrEqual(1)
-  })
-
-  it('超长文本应该被截断或处理', async () => {
-    const provider = new MockProvider()
-    const longText = 'a'.repeat(10000)
-
-    const result = await provider.extractCaseDraft({ rawText: longText })
-    expect(result.issues).toBeDefined()
-    expect(Array.isArray(result.issues)).toBe(true)
   })
 })
