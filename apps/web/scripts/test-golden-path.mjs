@@ -1,109 +1,139 @@
-// 黄金链路端到端测试脚本
+// 黄金链路端到端测试脚本 (API 级)
+// 覆盖 TASK.md Phase 2 验收: 一条 Intake 拆成两个 Issue,事项 0 关联已有 Case、事项 1 创建新 Case
+// 前置: pnpm --filter @onecase/db db:reset (断言依赖干净 seed,如 CASE-018 来源数为 0)
 // 用法: node scripts/test-golden-path.mjs [baseUrl]
 const BASE = process.argv[2] || 'http://localhost:3000'
 
+let failed = 0
+function check(name, cond, detail = '') {
+  if (cond) {
+    console.log(`  ✅ ${name}`)
+  } else {
+    failed++
+    console.log(`  ❌ ${name} ${detail}`)
+  }
+}
+
+async function post(path, body) {
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  return { res, data: await res.json().catch(() => ({})) }
+}
+
 async function main() {
-  console.log(`🧪 测试黄金链路: ${BASE}\n`)
+  console.log(`🧪 测试黄金链路 (一关联一新建): ${BASE}\n`)
 
   // ===== 步骤 1: 创建 Intake =====
   console.log('── 步骤 1: 创建 Intake ──')
-  const intakeRes = await fetch(`${BASE}/api/intakes`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      rawText: '王主任,我们三栋二单元那个灯又坏了,我妈昨天晚上回来差点摔倒。另外楼下垃圾今天也没人清。',
-      sourceType: 'text',
-      organizationId: 'demo-org',
-    }),
+  const intake = await post('/api/intakes', {
+    rawText: '王主任,我们三栋二单元那个灯又坏了,我妈昨天晚上回来差点摔倒。另外楼下垃圾今天也没人清。',
+    sourceType: 'text',
+    organizationId: 'demo-org',
   })
-  const intakeData = await intakeRes.json()
-  if (!intakeRes.ok || !intakeData.data?.id) {
-    console.error('❌ 创建 Intake 失败:', intakeData)
-    process.exit(1)
-  }
-  const intakeId = intakeData.data.id
-  console.log('✅ Intake 创建成功:', intakeId)
+  check('Intake 创建成功', intake.res.ok && !!intake.data.data?.id, JSON.stringify(intake.data))
+  const intakeId = intake.data.data.id
 
   // ===== 步骤 2: AI 分析 (期望识别 2 个事项) =====
   console.log('\n── 步骤 2: AI 分析 ──')
-  const analyzeRes = await fetch(`${BASE}/api/intakes/${intakeId}/analyze`, { method: 'POST' })
-  const analyzeData = await analyzeRes.json()
-  if (!analyzeRes.ok || !analyzeData.data?.analysisId) {
-    console.error('❌ AI 分析失败:', analyzeData)
-    process.exit(1)
-  }
-  const { analysisId, issues } = analyzeData.data
-  console.log('✅ 分析完成:', analysisId)
-  console.log(`   识别到 ${issues.length} 个事项:`)
-  issues.forEach((x, i) =>
-    console.log(`   [${i}] ${x.title} | ${x.suggestedPriority || '?'} | ${x.categoryCode || '未分类'}`)
-  )
-  if (issues.length !== 2) {
-    console.error(`❌ 期望 2 个事项,实际 ${issues.length} 个`)
-    process.exit(1)
+  const analyze = await post(`/api/intakes/${intakeId}/analyze`)
+  check('分析完成', analyze.res.ok && !!analyze.data.data?.analysisId, JSON.stringify(analyze.data))
+  const { analysisId, issues } = analyze.data.data
+  check('拆分出 2 个事项', issues?.length === 2, `实际 ${issues?.length}`)
+  if (issues?.length === 2) {
+    check(
+      '事项 0 = 楼道照明',
+      issues[0].title.includes('照明'),
+      issues[0].title
+    )
+    check(
+      '事项 1 = 垃圾清运',
+      issues[1].title.includes('垃圾'),
+      issues[1].title
+    )
   }
 
   // ===== 步骤 3: 幂等验证 (重复分析不产生新记录) =====
   console.log('\n── 步骤 3: 幂等验证 ──')
-  const reAnalyzeRes = await fetch(`${BASE}/api/intakes/${intakeId}/analyze`, { method: 'POST' })
-  const reAnalyzeData = await reAnalyzeRes.json()
-  if (reAnalyzeData.data?.analysisId === analysisId) {
-    console.log('✅ 幂等: 返回相同 analysisId')
-  } else {
-    console.error('❌ 幂等失败: 返回了不同的 analysisId')
-    process.exit(1)
-  }
+  const reAnalyze = await post(`/api/intakes/${intakeId}/analyze`)
+  check('重复分析返回相同 analysisId', reAnalyze.data.data?.analysisId === analysisId)
 
-  // ===== 步骤 4: Confirm (事项0关联已有, 事项1创建新) =====
-  console.log('\n── 步骤 4: Confirm 决策 ──')
-
-  // 先找一个可关联的 Case
-  const casesRes = await fetch(`${BASE}/api/cases`)
-  const casesData = await casesRes.json()
-  const targetCase = casesData.data?.[0]
-  if (!targetCase) {
-    console.error('❌ 没有可关联的 Case (seed 数据缺失)')
-    process.exit(1)
-  }
-  console.log(`   关联目标: ${targetCase.caseNumber} - ${targetCase.title}`)
-
-  const confirmRes = await fetch(`${BASE}/api/intakes/${intakeId}/confirm`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      analysisId,
-      issueDecisions: [
-        { issueIndex: 0, decision: 'CREATE_CASE' },
-        { issueIndex: 1, decision: 'CREATE_CASE' },
-      ],
-      userId: 'demo-user',
-    }),
+  // ===== 步骤 4: Duplicate 候选 (与 Review 页相同路径) =====
+  console.log('\n── 步骤 4: Duplicate 候选 ──')
+  const dup = await post('/api/duplicates/find', {
+    title: issues[0].title,
+    categoryCode: issues[0].categoryCode,
+    locationText: issues[0].locationText,
   })
-  const confirmData = await confirmRes.json()
-  if (!confirmRes.ok || !confirmData.data?.success) {
-    console.error('❌ Confirm 失败:', JSON.stringify(confirmData, null, 2))
-    process.exit(1)
+  const candidates = dup.data.data?.candidates || []
+  check('返回候选 ≥ 1', candidates.length >= 1, JSON.stringify(dup.data))
+  const target = candidates[0]
+  console.log(
+    `   关联目标: ${target?.caseNumber} score=${target?.score.toFixed(3)} [${target?.matchReasons.join('/')}]`
+  )
+  // Hard Negative 保护: 3栋1单元 (CASE-011) 描述相似但位置不同,不得成为首位候选
+  const hardNegative = candidates.find((c) => c.caseNumber === 'CASE-011')
+  if (hardNegative) {
+    check(
+      'Hard Negative (CASE-011) 未排首位且标注位置不同',
+      target.caseNumber !== 'CASE-011' && hardNegative.matchReasons.includes('位置不同'),
+      `首位 ${target.caseNumber}, reasons=${hardNegative.matchReasons.join('/')}`
+    )
   }
-  console.log(`✅ Confirm 成功:`)
-  console.log(`   创建: ${confirmData.data.createdCases.map((c) => c.caseNumber).join(', ')}`)
 
-  // ===== 步骤 5: 验证 Intake 状态 =====
-  console.log('\n── 步骤 5: 验证最终状态 ──')
-  const finalRes = await fetch(`${BASE}/api/intakes/${intakeId}`)
-  const finalData = await finalRes.json()
-  console.log(`   Intake 状态: ${finalData.data?.status}`)
+  // ===== 步骤 5: Confirm — 事项 0 关联已有 / 事项 1 创建新 =====
+  console.log('\n── 步骤 5: Confirm (一关联一新建) ──')
+  const casesBefore = ((await (await fetch(`${BASE}/api/cases`)).json()).data || []).length
+  const confirm = await post(`/api/intakes/${intakeId}/confirm`, {
+    analysisId,
+    issueDecisions: [
+      { issueIndex: 0, decision: 'LINK_EXISTING', targetCaseId: target.caseId },
+      { issueIndex: 1, decision: 'CREATE_CASE' },
+    ],
+    userId: 'demo-user',
+  })
+  check('Confirm 成功', confirm.res.ok && confirm.data.data?.success === true, JSON.stringify(confirm.data))
 
-  const newCasesRes = await fetch(`${BASE}/api/cases`)
-  const newCasesData = await newCasesRes.json()
-  console.log(`   系统 Case 总数: ${newCasesData.data?.length}`)
+  const { createdCases, linkedCases } = confirm.data.data || {}
+  check('关联 1 个 Case 且指向目标', linkedCases?.length === 1 && linkedCases[0].caseNumber === target.caseNumber, JSON.stringify(linkedCases))
+  check('创建 1 个 Case', createdCases?.length === 1, JSON.stringify(createdCases))
 
-  if (finalData.data?.status === 'CONFIRMED') {
-    console.log('\n🎉🎉🎉 黄金链路测试全部通过!')
-    console.log('   1 Intake → 2 Issues → 确认 → Case 创建 + Intake CONFIRMED')
-  } else {
-    console.error('\n❌ Intake 状态不是 CONFIRMED')
-    process.exit(1)
-  }
+  // ===== 步骤 6: 幂等 — 重复 Confirm 被拒 =====
+  console.log('\n── 步骤 6: Confirm 幂等 ──')
+  const again = await post(`/api/intakes/${intakeId}/confirm`, {
+    analysisId,
+    issueDecisions: [{ issueIndex: 1, decision: 'CREATE_CASE' }],
+    userId: 'demo-user',
+  })
+  check(
+    '重复确认被拒 (INTAKE_ALREADY_CONFIRMED)',
+    again.data.data?.success !== true &&
+      (again.data.details || []).includes('INTAKE_ALREADY_CONFIRMED'),
+    JSON.stringify(again.data)
+  )
+  const afterAgain = await (await fetch(`${BASE}/api/cases`)).json()
+  check(
+    '重复确认未多创建 Case',
+    afterAgain.data.length === casesBefore + 1,
+    `期望 ${casesBefore + 1},实际 ${afterAgain.data.length}`
+  )
+
+  // ===== 步骤 7: 关联目标 Case — 来源 +1、Timeline 审计 =====
+  console.log('\n── 步骤 7: 关联目标 Case 校验 ──')
+  const detail = (await (await fetch(`${BASE}/api/cases/${target.caseNumber}`)).json()).data
+  check('居民来源 +1', detail.sources?.length === 1, `实际 ${detail.sources?.length}`)
+  check('来源指向本 Intake', detail.sources?.[0]?.intake?.id === intakeId)
+  check('Timeline 出现关联审计', (detail.timeline || []).length >= 1)
+
+  // ===== 步骤 8: Intake 终态 =====
+  console.log('\n── 步骤 8: Intake 终态 ──')
+  const finalData = (await (await fetch(`${BASE}/api/intakes/${intakeId}`)).json()).data
+  check('Intake 状态 = CONFIRMED', finalData?.status === 'CONFIRMED', `实际 ${finalData?.status}`)
+
+  console.log('\n' + (failed === 0 ? '🎉 黄金链路 (一关联一新建) 全部通过!' : `❌ ${failed} 项未通过`))
+  process.exit(failed === 0 ? 0 : 1)
 }
 
 main().catch((e) => {
