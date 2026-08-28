@@ -83,6 +83,31 @@ async function main() {
   const plainDetail = (await (await fetch(`${BASE}/api/cases/${plain.data.data.caseNumber}`)).json()).data
   check('无来源 Case sources = 0', plainDetail.sources?.length === 0)
 
+  // ===== 场景 5: 成功分析的多 Issue Intake 不能被手动创建旁路 =====
+  console.log('\n── 场景 5: ANALYZED Intake 拒绝手动兜底 (INTAKE_REQUIRES_REVIEW) ──')
+  const casesBeforeBypass = (await (await fetch(`${BASE}/api/cases`)).json()).data.length
+  const analyzedIntake = await post('/api/intakes', {
+    rawText: '三栋二单元那个灯又坏了,另外垃圾也没人清。',
+    sourceType: 'text',
+    organizationId: 'demo-org',
+  })
+  const analyzedId = analyzedIntake.data.data.id
+  await post(`/api/intakes/${analyzedId}/analyze`)
+  const bypass = await post('/api/cases', {
+    title: '旁路 Case 测试',
+    sourceIntakeId: analyzedId,
+    userId: 'test-user',
+  })
+  check(
+    '手动创建被拒 (INTAKE_REQUIRES_REVIEW)',
+    bypass.res.status === 422 && (bypass.data.details || []).includes('INTAKE_REQUIRES_REVIEW'),
+    `HTTP ${bypass.res.status} ${JSON.stringify(bypass.data)}`
+  )
+  const analyzedStatus = (await (await fetch(`${BASE}/api/intakes/${analyzedId}`)).json()).data
+  const casesAfterBypass = (await (await fetch(`${BASE}/api/cases`)).json()).data.length
+  check('Intake 保持 ANALYZED', analyzedStatus?.status === 'ANALYZED', `实际 ${analyzedStatus?.status}`)
+  check('数据库零写入', casesAfterBypass === casesBeforeBypass, `期望 ${casesBeforeBypass},实际 ${casesAfterBypass}`)
+
   console.log('\n' + (failed === 0 ? '🎉 手动创建链路全部通过!' : `❌ ${failed} 项未通过`))
   process.exit(failed === 0 ? 0 : 1)
 }

@@ -88,6 +88,39 @@ export async function confirmIntake(params: ConfirmIntakeParams): Promise<Confir
       })
       const issueMap = new Map(analysisIssues.map((i) => [i.issueIndex, i]))
 
+      // ---- 决策完整性校验 (业务不变量: 每个 Issue 必须且只能有一个显式决策) ----
+      // 任一失败即中止事务: 不产生 Case/CaseSource/CaseAction,不改变 Intake 状态
+      if (analysisIssues.length === 0) {
+        throw new Error('ANALYSIS_ISSUES_EMPTY')
+      }
+
+      const VALID_DECISIONS = new Set(['CREATE_CASE', 'LINK_EXISTING', 'REJECTED'])
+      const seenIndexes = new Set<number>()
+      for (const decision of issueDecisions) {
+        if (!VALID_DECISIONS.has(decision.decision)) {
+          throw new Error('INVALID_ISSUE_DECISION')
+        }
+        // LINK_EXISTING 必须指向目标;其他决策携带目标即视为歧义请求
+        if (decision.decision === 'LINK_EXISTING' && !decision.targetCaseId) {
+          throw new Error('TARGET_CASE_ID_REQUIRED')
+        }
+        if (decision.decision !== 'LINK_EXISTING' && decision.targetCaseId) {
+          throw new Error('INVALID_ISSUE_DECISION')
+        }
+        if (seenIndexes.has(decision.issueIndex)) {
+          throw new Error('DUPLICATE_ISSUE_DECISION')
+        }
+        seenIndexes.add(decision.issueIndex)
+      }
+      if (issueDecisions.length !== analysisIssues.length) {
+        throw new Error('ISSUE_DECISIONS_INCOMPLETE')
+      }
+      for (const decision of issueDecisions) {
+        if (!issueMap.has(decision.issueIndex)) {
+          throw new Error('INVALID_ISSUE_DECISION')
+        }
+      }
+
       for (const decision of issueDecisions) {
         const issue = issueMap.get(decision.issueIndex)
 
@@ -190,6 +223,11 @@ export async function confirmIntake(params: ConfirmIntakeParams): Promise<Confir
 
           if (!targetCase) {
             throw new Error('TARGET_CASE_NOT_FOUND')
+          }
+
+          // 组织一致性: 目标 Case 必须与 Intake 同组织 (同一业务不变量)
+          if (targetCase.organizationId !== intake.organizationId) {
+            throw new Error('TARGET_CASE_ORG_MISMATCH')
           }
 
           // 检查是否已关联 (唯一约束)

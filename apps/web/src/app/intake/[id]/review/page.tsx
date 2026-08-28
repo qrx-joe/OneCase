@@ -2,7 +2,7 @@
 // Intake Review 页面: AI Draft + Duplicate 候选 + Link/Create 决策
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { AppLayout } from '@/components/AppLayout'
 import { Button, Badge } from '@/components'
@@ -49,6 +49,11 @@ export default function IntakeReviewPage() {
   const [decisions, setDecisions] = useState<Record<number, { decision: Decision; targetCaseId?: string }>>({})
   // 人工编辑的草稿字段 (只记录改动过的字段,未改动的沿用 AI 原值)
   const [edits, setEdits] = useState<Record<number, { title?: string; locationText?: string; suggestedPriority?: string }>>({})
+  // Duplicate 候选一致性: 编辑标题/地点后旧候选过期 (P2),重查成功前不得作为当前结果
+  const [staleCandidates, setStaleCandidates] = useState<Record<number, boolean>>({})
+  const [dupErrors, setDupErrors] = useState<Record<number, boolean>>({})
+  // 每个 Issue 最近一次候选查询使用的草稿值
+  const lastQueryRef = useRef<Record<number, { title: string; location: string }>>({})
 
   useEffect(() => {
     async function load() {
@@ -88,6 +93,13 @@ export default function IntakeReviewPage() {
             })
           )
           setCandidates(allCandidates)
+          // 记录本次候选使用的草稿值,后续编辑据此判断是否过期
+          data.data.issues.forEach((issue: Issue, idx: number) => {
+            lastQueryRef.current[idx] = {
+              title: issue.title,
+              location: issue.locationText ?? '',
+            }
+          })
         }
       } catch (e) {
         console.error('Load review failed:', e)
@@ -98,6 +110,68 @@ export default function IntakeReviewPage() {
     }
     load()
   }, [intakeId])
+
+  // 草稿编辑使旧候选过期: 标记 stale、清除基于旧候选的 LINK 决策,
+  // debounce 600ms 后按人工编辑值重新检索 (避免每次按键都请求)
+  useEffect(() => {
+    if (issues.length === 0) return
+    const timers: ReturnType<typeof setTimeout>[] = []
+
+    issues.forEach((issue, idx) => {
+      const lastQuery = lastQueryRef.current[idx]
+      if (!lastQuery) return
+      const title = edits[idx]?.title ?? issue.title
+      const location = edits[idx]?.locationText ?? issue.locationText ?? ''
+      if (title === lastQuery.title && location === lastQuery.location) return
+
+      setStaleCandidates((prev) => ({ ...prev, [idx]: true }))
+      setDecisions((prev) => {
+        if (prev[idx]?.decision !== 'LINK_EXISTING') return prev
+        const next = { ...prev }
+        delete next[idx]
+        return next
+      })
+
+      timers.push(
+        setTimeout(async () => {
+          try {
+            const res = await fetch('/api/duplicates/find', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                title,
+                locationText: location,
+                categoryCode: issue.categoryCode,
+                organizationId: 'demo-org',
+              }),
+            })
+            const data = await res.json()
+            const list: DuplicateCandidate[] =
+              res.ok && data.data?.candidates ? data.data.candidates : []
+            setCandidates((prev) => {
+              const next = [...prev]
+              next[idx] = list
+              return next
+            })
+            setDupErrors((prev) => ({ ...prev, [idx]: !res.ok }))
+          } catch {
+            // 检索失败不阻塞创建新 Case,但旧候选已清空,不得继续展示
+            setCandidates((prev) => {
+              const next = [...prev]
+              next[idx] = []
+              return next
+            })
+            setDupErrors((prev) => ({ ...prev, [idx]: true }))
+          } finally {
+            setStaleCandidates((prev) => ({ ...prev, [idx]: false }))
+            lastQueryRef.current[idx] = { title, location }
+          }
+        }, 600)
+      )
+    })
+
+    return () => timers.forEach((t) => clearTimeout(t))
+  }, [edits, issues])
 
   const setDecision = useCallback((index: number, decision: Decision, targetCaseId?: string) => {
     setDecisions((prev) => ({
@@ -348,17 +422,30 @@ export default function IntakeReviewPage() {
               <div key={idx} className="duplicate-card">
                 <div className="dup-head">
                   <h3>事项 {idx + 1} 的相似候选</h3>
-                  <p>候选仅用于辅助判断，不会自动合并。评分未校准。</p>
+                  <p>
+                    {staleCandidates[idx]
+                      ? '草稿已修改,以下候选基于旧值,正在重新检索…'
+                      : '候选仅用于辅助判断，不会自动合并。评分未校准。'}
+                  </p>
                 </div>
 
-                {issueCandidates.length === 0 ? (
+                {dupErrors[idx] ? (
+                  <div style={{ padding: '20px 15px' }}>
+                    <p style={{ fontSize: 10, color: '#C92F27', textAlign: 'center' }}>
+                      候选检索失败,可继续创建新 Case
+                    </p>
+                  </div>
+                ) : issueCandidates.length === 0 ? (
                   <div style={{ padding: '20px 15px' }}>
                     <p style={{ fontSize: 10, color: 'var(--text-3)', textAlign: 'center' }}>
-                      暂无相似候选,建议创建新 Case
+                      {staleCandidates[idx]
+                        ? '正在按修改后的草稿重新检索…'
+                        : '暂无相似候选,建议创建新 Case'}
                     </p>
                   </div>
                 ) : (
-                  issueCandidates.map((c) => (
+                  <div style={{ opacity: staleCandidates[idx] ? 0.45 : 1 }}>
+                    {issueCandidates.map((c) => (
                     <div key={c.caseId} className="dup-item">
                       <div className="dup-score">
                         <b>{c.caseNumber}</b>
@@ -394,7 +481,8 @@ export default function IntakeReviewPage() {
                         </a>
                       </div>
                     </div>
-                  ))
+                    ))}
+                  </div>
                 )}
               </div>
             )

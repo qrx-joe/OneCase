@@ -54,10 +54,45 @@ export async function POST(request: NextRequest) {
     })
 
     if (!result.success) {
-      const status = result.errors.includes('TITLE_REQUIRED') ? 400 : 500
+      if (result.errors.includes('TITLE_REQUIRED') || result.errors.includes('TITLE_TOO_LONG') || result.errors.some((e) => e.startsWith('INVALID_PRIORITY'))) {
+        return NextResponse.json(
+          { error: 'INVALID_REQUEST', details: result.errors },
+          { status: 400 }
+        )
+      }
+      if (result.errors.includes('SOURCE_INTAKE_NOT_FOUND')) {
+        return NextResponse.json(
+          { error: 'SOURCE_INTAKE_NOT_FOUND', details: result.errors },
+          { status: 404 }
+        )
+      }
+      if (result.errors.includes('INTAKE_ALREADY_CONFIRMED')) {
+        return NextResponse.json(
+          { error: 'INTAKE_ALREADY_CONFIRMED', details: result.errors },
+          { status: 409 }
+        )
+      }
+      if (
+        result.errors.includes('INTAKE_REQUIRES_REVIEW') ||
+        result.errors.includes('INTAKE_ANALYZE_IN_PROGRESS') ||
+        result.errors.includes('INTAKE_NOT_ELIGIBLE_FOR_MANUAL') ||
+        result.errors.includes('SOURCE_INTAKE_ORG_MISMATCH')
+      ) {
+        return NextResponse.json(
+          {
+            error: result.errors[0],
+            message:
+              result.errors.includes('INTAKE_REQUIRES_REVIEW')
+                ? '该 Intake 已完成 AI 分析,请回到 Review 页逐项确认'
+                : undefined,
+            details: result.errors,
+          },
+          { status: 422 }
+        )
+      }
       return NextResponse.json(
         { error: 'Failed to create case', details: result.errors },
-        { status }
+        { status: 500 }
       )
     }
 

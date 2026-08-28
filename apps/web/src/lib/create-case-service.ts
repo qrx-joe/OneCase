@@ -53,15 +53,40 @@ export async function createCaseManually(
       const organizationId = await resolveOrgId(params.organizationId)
       const caseNumber = await generateCaseNumber(tx)
 
-      let sourceIntake: { id: string; status: string } | null = null
+      let sourceIntake: { id: string; status: string; organizationId: string } | null = null
       if (params.sourceIntakeId) {
         sourceIntake = await tx.intake.findUnique({
           where: { id: params.sourceIntakeId },
-          select: { id: true, status: true },
+          select: { id: true, status: true, organizationId: true },
         })
         if (!sourceIntake) throw new Error('SOURCE_INTAKE_NOT_FOUND')
+
+        // ---- 兜底门禁 (业务不变量): 手动创建只能消费未完成 AI 分析的 Intake ----
+        // 成功分析的多 Issue Intake 必须走 Review 页逐项决策,不能被单个 Case 吞掉
         if (sourceIntake.status === 'CONFIRMED') {
           throw new Error('INTAKE_ALREADY_CONFIRMED')
+        }
+        if (sourceIntake.status === 'ANALYZED') {
+          throw new Error('INTAKE_REQUIRES_REVIEW')
+        }
+        if (sourceIntake.status === 'ANALYZING') {
+          throw new Error('INTAKE_ANALYZE_IN_PROGRESS')
+        }
+        if (sourceIntake.status !== 'PENDING') {
+          throw new Error('INTAKE_NOT_ELIGIBLE_FOR_MANUAL')
+        }
+        const analysis = await tx.intakeAnalysis.findUnique({
+          where: { intakeId: sourceIntake.id },
+          select: { status: true },
+        })
+        if (analysis?.status === 'COMPLETED') {
+          throw new Error('INTAKE_REQUIRES_REVIEW')
+        }
+        // 允许: PENDING + (无 Analysis | FAILED Analysis)
+
+        // 组织一致性: 来源 Intake 必须与新 Case 同组织
+        if (sourceIntake.organizationId !== organizationId) {
+          throw new Error('SOURCE_INTAKE_ORG_MISMATCH')
         }
       }
 
