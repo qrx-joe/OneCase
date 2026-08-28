@@ -211,6 +211,12 @@ export async function confirmIntake(params: ConfirmIntakeParams): Promise<Confir
             id: newCase.id,
             caseNumber: newCase.caseNumber,
           })
+
+          // 决策留痕: Issue 的最终去向写入 IntakeIssue (事后可审计,不靠推断)
+          await tx.intakeIssue.update({
+            where: { id: issue.id },
+            data: { action: 'CREATE_CASE', confirmedCaseId: newCase.id },
+          })
         } else if (decision.decision === 'LINK_EXISTING') {
           // 关联已有 Case
           if (!decision.targetCaseId) {
@@ -267,8 +273,19 @@ export async function confirmIntake(params: ConfirmIntakeParams): Promise<Confir
             caseId: targetCase.id,
             caseNumber: targetCase.caseNumber,
           })
+
+          // 决策留痕
+          await tx.intakeIssue.update({
+            where: { id: issue.id },
+            data: { action: 'LINK_EXISTING', confirmedCaseId: targetCase.id },
+          })
+        } else {
+          // REJECTED: 显式留痕 (拒绝也是人工决策,不留在无记录状态)
+          await tx.intakeIssue.update({
+            where: { id: issue.id },
+            data: { action: 'REJECTED' },
+          })
         }
-        // REJECTED: 不做任何操作
       }
 
       // 4. 更新 Intake 状态

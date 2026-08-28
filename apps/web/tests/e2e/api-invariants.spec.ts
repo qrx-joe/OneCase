@@ -97,3 +97,24 @@ test('ANALYZED Intake 手动创建被旁路拒绝 → 422 INTAKE_REQUIRES_REVIEW
   const final = await (await request.get(`/api/intakes/${intakeId}`)).json()
   expect(final.data.status).toBe('ANALYZED')
 })
+
+test('已 CONFIRMED Intake 不能再分析 → 409 (防 CONFIRMED 被覆盖回 ANALYZED)', async ({ request }) => {
+  const { intakeId, analysisId } = await createAnalyzedIntake(request)
+  const cases = await (await request.get('/api/cases')).json()
+  const confirm = await request.post(`/api/intakes/${intakeId}/confirm`, {
+    data: {
+      analysisId,
+      issueDecisions: [
+        { issueIndex: 0, decision: 'REJECTED' },
+        { issueIndex: 1, decision: 'REJECTED' },
+      ],
+      userId: 'e2e',
+    },
+  })
+  expect(confirm.ok()).toBeTruthy()
+
+  const reAnalyze = await request.post(`/api/intakes/${intakeId}/analyze`)
+  expect(reAnalyze.status()).toBe(409)
+  const final = await (await request.get(`/api/intakes/${intakeId}`)).json()
+  expect(final.data.status).toBe('CONFIRMED')
+})

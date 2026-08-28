@@ -22,6 +22,17 @@ export async function POST(
       )
     }
 
+    // 已人工确认的 Intake 不再分析: 防止把 CONFIRMED 覆盖回 ANALYZED 后被重复确认
+    if (intake.status === 'CONFIRMED') {
+      return NextResponse.json(
+        {
+          error: 'INTAKE_ALREADY_CONFIRMED',
+          message: '该 Intake 已确认,不能再分析',
+        },
+        { status: 409 }
+      )
+    }
+
     // 幂等: 已完成的分析直接返回,不重复调用 AI
     const existing = await prisma.intakeAnalysis.findUnique({
       where: { intakeId: id },

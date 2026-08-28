@@ -28,6 +28,10 @@ export interface CreateCaseResult {
 
 const VALID_PRIORITIES = new Set(['P1', 'P2', 'P3', 'UNKNOWN'])
 
+// ANALYZING 超过该时长视为分析进程已死亡,允许手动兜底
+// (最长在途请求 = 超时 30s × (1+重试) ≈ 90s,10 分钟阈值有充分余量)
+const STALE_ANALYZING_MS = 10 * 60 * 1000
+
 export async function createCaseManually(
   params: CreateCaseParams
 ): Promise<CreateCaseResult> {
@@ -53,11 +57,16 @@ export async function createCaseManually(
       const organizationId = await resolveOrgId(params.organizationId)
       const caseNumber = await generateCaseNumber(tx)
 
-      let sourceIntake: { id: string; status: string; organizationId: string } | null = null
+      let sourceIntake: {
+        id: string
+        status: string
+        organizationId: string
+        updatedAt: Date
+      } | null = null
       if (params.sourceIntakeId) {
         sourceIntake = await tx.intake.findUnique({
           where: { id: params.sourceIntakeId },
-          select: { id: true, status: true, organizationId: true },
+          select: { id: true, status: true, organizationId: true, updatedAt: true },
         })
         if (!sourceIntake) throw new Error('SOURCE_INTAKE_NOT_FOUND')
 
@@ -70,9 +79,12 @@ export async function createCaseManually(
           throw new Error('INTAKE_REQUIRES_REVIEW')
         }
         if (sourceIntake.status === 'ANALYZING') {
-          throw new Error('INTAKE_ANALYZE_IN_PROGRESS')
-        }
-        if (sourceIntake.status !== 'PENDING') {
+          // 在途分析未超时 → 拒绝;超时视为进程已死亡 (崩溃/重启遗留),允许兜底
+          const analyzingMs = Date.now() - sourceIntake.updatedAt.getTime()
+          if (analyzingMs < STALE_ANALYZING_MS) {
+            throw new Error('INTAKE_ANALYZE_IN_PROGRESS')
+          }
+        } else if (sourceIntake.status !== 'PENDING') {
           throw new Error('INTAKE_NOT_ELIGIBLE_FOR_MANUAL')
         }
         const analysis = await tx.intakeAnalysis.findUnique({
@@ -82,7 +94,7 @@ export async function createCaseManually(
         if (analysis?.status === 'COMPLETED') {
           throw new Error('INTAKE_REQUIRES_REVIEW')
         }
-        // 允许: PENDING + (无 Analysis | FAILED Analysis)
+        // 允许: PENDING + (无 Analysis | FAILED Analysis),以及卡死超时的 ANALYZING
 
         // 组织一致性: 来源 Intake 必须与新 Case 同组织
         if (sourceIntake.organizationId !== organizationId) {

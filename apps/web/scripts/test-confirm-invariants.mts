@@ -164,6 +164,22 @@ async function main() {
   })
   check('全部显式 REJECTED 成功', rejected.success && rejected.createdCases.length === 0 && rejected.linkedCases.length === 0, JSON.stringify(rejected.errors))
   check('全拒绝不产生 Case', (await prisma.case.count()) === casesBeforeB)
+  // 决策留痕: 每个 Issue 的 action 都被显式写入,不靠推断
+  const bIssues = await prisma.intakeIssue.findMany({ where: { analysisId: b.analysisId } })
+  check(
+    'REJECTED 决策留痕 (IntakeIssue.action)',
+    bIssues.length === 2 && bIssues.every((i) => i.action === 'REJECTED'),
+    JSON.stringify(bIssues.map((i) => [i.issueIndex, i.action]))
+  )
+  const aIssues = await prisma.intakeIssue.findMany({ where: { analysisId: a.analysisId } })
+  const linkedIssue = aIssues.find((i) => i.issueIndex === 0)!
+  const createdIssue = aIssues.find((i) => i.issueIndex === 1)!
+  check(
+    '关联/创建决策留痕 (action + confirmedCaseId)',
+    linkedIssue.action === 'LINK_EXISTING' && linkedIssue.confirmedCaseId === ok.linkedCases[0].caseId &&
+    createdIssue.action === 'CREATE_CASE' && createdIssue.confirmedCaseId === ok.createdCases[0].id,
+    JSON.stringify(aIssues.map((i) => [i.issueIndex, i.action, i.confirmedCaseId]))
+  )
 
   // ============================================================
   // §4 手动兜底不能绕过已完成的 Analysis
@@ -216,6 +232,35 @@ async function main() {
     sourceIntakeId: failedIntake.id,
   })
   check('重复兜底被拒 (INTAKE_ALREADY_CONFIRMED)', !repeat.success && repeat.errors.includes('INTAKE_ALREADY_CONFIRMED'), JSON.stringify(repeat.errors))
+
+  console.log('\n── §4-4 ANALYZING 状态: 在途拒绝 / 卡死超时放行 ──')
+  // 在途 (updatedAt = 现在): 拒绝
+  const inflight = await prisma.intake.create({
+    data: { organizationId: org!.id, sourceType: 'text', rawText: '正在分析中的反馈', status: 'ANALYZING' },
+  })
+  const inflightReject = await createCaseManually({
+    title: '在途兜底测试',
+    organizationId: 'demo-org',
+    sourceIntakeId: inflight.id,
+  })
+  check('在途 ANALYZING 被拒 (INTAKE_ANALYZE_IN_PROGRESS)', !inflightReject.success && inflightReject.errors.includes('INTAKE_ANALYZE_IN_PROGRESS'), JSON.stringify(inflightReject.errors))
+  // 卡死 (updatedAt = 11 分钟前,显式回写): 放行
+  const stuck = await prisma.intake.create({
+    data: { organizationId: org!.id, sourceType: 'text', rawText: '进程崩溃遗留的反馈', status: 'ANALYZING' },
+  })
+  await prisma.intake.update({
+    where: { id: stuck.id },
+    data: { updatedAt: new Date(Date.now() - 11 * 60 * 1000) },
+  })
+  const stuckFallback = await createCaseManually({
+    title: '卡死 ANALYZING 人工兜底',
+    organizationId: 'demo-org',
+    sourceIntakeId: stuck.id,
+    userId: 'invariant-test',
+  })
+  check('卡死超时 (>10min) 的 ANALYZING 允许兜底', stuckFallback.success && !!stuckFallback.caseNumber, JSON.stringify(stuckFallback.errors))
+  const stuckStatus = (await prisma.intake.findUnique({ where: { id: stuck.id } }))!.status
+  check('卡死兜底后 Intake = CONFIRMED', stuckStatus === 'CONFIRMED', `实际 ${stuckStatus}`)
 
   // ============================================================
   // §7 组织一致性
