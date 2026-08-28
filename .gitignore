@@ -10,3 +10,5 @@ dist
 coverage
 .vercel
 *.tsbuildinfo
+packages/db/prisma/dev.db
+packages/db/prisma/*.db-journal
