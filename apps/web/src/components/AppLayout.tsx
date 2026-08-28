@@ -15,7 +15,13 @@ export function AppLayout({ children, title }: AppLayoutProps) {
   const pathname = usePathname()
   const [searchQuery, setSearchQuery] = useState('')
 
-  const navItems = [
+  // count: Phase 4 数据概览页恢复后使用的角标位
+  const navItems: Array<{
+    href: string
+    label: string
+    icon: React.ReactNode
+    count?: number
+  }> = [
     {
       href: '/',
       label: '今日工作',

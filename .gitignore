@@ -12,3 +12,6 @@ coverage
 *.tsbuildinfo
 packages/db/prisma/dev.db
 packages/db/prisma/*.db-journal
+# Playwright 运行产物
+apps/web/test-results
+apps/web/playwright-report
