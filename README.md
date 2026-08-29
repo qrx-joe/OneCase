@@ -85,7 +85,7 @@ pnpm --filter @onecase/db db:reset    # 清空业务表 + 重新 seed
 
 ```bash
 pnpm --filter @onecase/domain test   # Domain 33/33 (状态机/优先级/评分)
-pnpm --filter @onecase/ai test       # AI 26/26 (Mock/Qwen/OpenAI/Contract/超时/重试)
+pnpm --filter @onecase/ai test       # AI 47/47 (Mock/Qwen/OpenAI/Contract/超时/重试/Eval 20 条)
 
 # 端到端 (需 Dev Server 运行在 3000,脚本需先 db:reset)
 node apps/web/scripts/test-golden-path.mjs    # 黄金链路 (创建→分析→确认,一关联一新建+幂等)
@@ -97,6 +97,10 @@ pnpm --filter @onecase/web test:e2e           # 黄金链路 + 草稿编辑
 
 pnpm --filter @onecase/web build     # 构建验证
 ```
+
+**CI**: GitHub Actions (`.github/workflows/ci.yml`) 在每次 push/PR 上自动跑 typecheck、单测（含 20 条合成 Eval）、全仓 build 与 Playwright E2E。
+
+**Eval**: `packages/ai/__tests__/eval.test.ts` 默认对 Mock 基线跑 20 条合成用例（100% 通过 = 可执行规格）；设置 `EVAL_PROVIDER=qwen` + `QWEN_API_KEY` 后对真实 Provider 运行，输出通过率与模型/Prompt/Schema 版本记录（真实 Provider 只报告偏差，不硬性失败）。
 
 ---
 
