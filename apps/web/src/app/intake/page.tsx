@@ -127,11 +127,12 @@ export default function NewIntakePage() {
             className="field"
             placeholder="粘贴居民反馈..."
             value={rawText}
+            maxLength={10000}
             disabled={restoring || loading}
             onChange={(e) => setRawText(e.target.value)}
           />
           <span className="field-hint">
-            原始内容视为未可信数据；AI 只做结构化建议，不直接创建正式 Case。
+            最多 10000 字符。原始内容视为未可信数据；AI 只做结构化建议，不直接创建正式 Case。
           </span>
 
           <div className="dropzone">

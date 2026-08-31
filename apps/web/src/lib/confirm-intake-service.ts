@@ -68,6 +68,9 @@ export async function confirmIntake(params: ConfirmIntakeParams): Promise<Confir
       if (intake.status === 'CONFIRMED') {
         throw new Error('INTAKE_ALREADY_CONFIRMED')
       }
+      if (intake.status !== 'ANALYZED') {
+        throw new Error('INTAKE_NOT_READY_FOR_CONFIRM')
+      }
 
       // 2. 校验 Analysis
       const analysis = await tx.intakeAnalysis.findUnique({
@@ -80,6 +83,9 @@ export async function confirmIntake(params: ConfirmIntakeParams): Promise<Confir
 
       if (analysis.intakeId !== intakeId) {
         throw new Error('ANALYSIS_INTAKE_MISMATCH')
+      }
+      if (analysis.status !== 'COMPLETED') {
+        throw new Error('ANALYSIS_NOT_COMPLETED')
       }
 
       // 3. 处理每个 Issue Decision

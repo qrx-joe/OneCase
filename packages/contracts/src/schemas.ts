@@ -4,6 +4,17 @@
 //       其余允许缺失 (optional) 或 null —— 缺失信息保持未知,不猜测
 import { z } from 'zod'
 
+export const MAX_INTAKE_TEXT_LENGTH = 10000
+
+// 保留原始文本,只校验类型、非空白和长度,不 trim 入库内容。
+export const CreateIntakeSchema = z.object({
+  rawText: z.string().max(MAX_INTAKE_TEXT_LENGTH, '原始反馈不能超过 10000 字符')
+    .refine(value => value.trim().length > 0, '原始反馈不能为空'),
+  organizationId: z.string().refine(value => value.trim().length > 0, 'organizationId is required'),
+  sourceType: z.string().min(1).default('text'),
+  idempotencyKey: z.string().min(1).optional(),
+})
+
 // Issue Draft Schema (AI 输出)
 export const IssueDraftSchema = z.object({
   title: z.string().min(1).max(200),

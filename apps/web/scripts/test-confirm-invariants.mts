@@ -10,6 +10,8 @@ import { createCaseManually } from '../src/lib/create-case-service'
 import { analyzeIntake, getExtractionProvider } from '../src/lib/ai-provider'
 import { STALE_ANALYZING_MS } from '../src/lib/intake-status'
 import { POST as analyzeRoute } from '../src/app/api/intakes/[id]/analyze/route'
+import { POST as createIntakeRoute } from '../src/app/api/intakes/route'
+import { POST as confirmRoute } from '../src/app/api/intakes/[id]/confirm/route'
 
 let failed = 0
 let checked = 0
@@ -28,6 +30,61 @@ async function callAnalyze(id: string) {
   const req = new NextRequest(`http://localhost/api/intakes/${id}/analyze`, { method: 'POST' })
   const res = await analyzeRoute(req, { params: Promise.resolve({ id }) })
   return { status: res.status, body: await res.json() }
+}
+
+async function checkIntakeBoundaries() {
+  console.log('\n── Intake 输入、幂等与 Confirm 状态门禁 ──')
+  async function create(body: unknown, raw = false) {
+    const res = await createIntakeRoute(new NextRequest('http://localhost/api/intakes', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: raw ? String(body) : JSON.stringify(body),
+    }))
+    return { status: res.status, body: await res.json() }
+  }
+  for (const [label, body] of [
+    ['空白文本', { rawText: ' \n\t', organizationId: 'demo-org' }],
+    ['非文本输入', { rawText: 123, organizationId: 'demo-org' }],
+    ['超长文本', { rawText: '字'.repeat(10001), organizationId: 'demo-org' }],
+    ['null 请求', null],
+    ['错误组织类型', { rawText: '内容', organizationId: 123 }],
+    ['错误 key 类型', { rawText: '内容', organizationId: 'demo-org', idempotencyKey: {} }],
+  ] as const) {
+    const before = await prisma.intake.count()
+    const response = await create(body)
+    check(`${label}: 返回 400 且零写入`, response.status === 400 && await prisma.intake.count() === before)
+  }
+  check('无效 JSON 返回 400', (await create('{', true)).status === 400)
+  const limit = await create({ rawText: '字'.repeat(10000), organizationId: 'demo-org' })
+  check('10000 字符边界可保存', limit.status === 200 && limit.body.data?.rawText.length === 10000)
+  const key = `boundary-${Date.now()}`
+  const payload = { rawText: '保留原文\n  电梯异常  ', organizationId: 'demo-org', idempotencyKey: key }
+  const responses = await Promise.all(Array.from({ length: 8 }, () => create(payload)))
+  const saved = await prisma.intake.findUniqueOrThrow({ where: { idempotencyKey: key } })
+  check('并发同 key 全部返回同一 Intake', responses.every(r => r.status === 200 && r.body.data?.id === saved.id))
+  check('幂等保存保留原文且只有一行', saved.rawText === payload.rawText && await prisma.intake.count({ where: { idempotencyKey: key } }) === 1)
+  const alias = await create({ ...payload, organizationId: saved.organizationId })
+  check('Demo 别名与真实组织 ID 重试一致', alias.status === 200 && alias.body.data?.id === saved.id)
+  for (const change of [{ rawText: '不同内容' }, { sourceType: 'other' }, { organizationId: 'foreign-org' }]) {
+    const response = await create({ ...payload, ...change })
+    check(`同 key 不同请求冲突 ${Object.keys(change)[0]}`, response.status === 409 && response.body.error === 'IDEMPOTENCY_KEY_CONFLICT' && !response.body.data)
+  }
+  for (const [status, analysisStatus, error] of [
+    ['PENDING', 'COMPLETED', 'INTAKE_NOT_READY_FOR_CONFIRM'],
+    ['ANALYZING', 'COMPLETED', 'INTAKE_NOT_READY_FOR_CONFIRM'],
+    ['ANALYZED', 'FAILED', 'ANALYSIS_NOT_COMPLETED'],
+  ]) {
+    const fixture = await createAnalyzedIntake('电梯异常')
+    await prisma.intake.update({ where: { id: fixture.intakeId }, data: { status } })
+    await prisma.intakeAnalysis.update({ where: { id: fixture.analysisId }, data: { status: analysisStatus } })
+    const before = await snapshot()
+    const response = await confirmRoute(new NextRequest('http://localhost/confirm', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ analysisId: fixture.analysisId, issueDecisions: [{ issueIndex: 0, decision: 'CREATE_CASE' }] }),
+    }), { params: Promise.resolve({ id: fixture.intakeId }) })
+    const body = await response.json()
+    check(`${status}/${analysisStatus}: Confirm 返回 422`, response.status === 422 && body.details?.includes(error))
+    check(`${status}/${analysisStatus}: 不写业务事实`, JSON.stringify(await snapshot()) === JSON.stringify(before) && (await prisma.intake.findUniqueOrThrow({ where: { id: fixture.intakeId } })).status === status)
+  }
 }
 
 /** 真实 handler + SQLite: 失败、再次失败、恢复或人工兜底均复用同一 Intake。 */
@@ -561,6 +618,7 @@ async function main() {
   const dStatus = (await prisma.intake.findUnique({ where: { id: d.intakeId } }))!.status
   check('跨组织 LINK 被拒后零写入', beforeD.cases === afterD.cases && beforeD.sources === afterD.sources && dStatus === 'ANALYZED', JSON.stringify({ afterD, dStatus }))
 
+  await checkIntakeBoundaries()
   console.log(`\n业务不变量: ${checked - failed}/${checked} 项通过`)
   } finally {
     // 测试自清理: 不把跨组织数据留在 Demo 基线 (codex P2-4)
