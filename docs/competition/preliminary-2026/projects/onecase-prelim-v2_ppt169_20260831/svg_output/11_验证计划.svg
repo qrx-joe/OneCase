@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <rect width="1280" height="720" fill="#FAFAF7"/>
+
+  <g id="header">
+    <text x="64" y="76" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#D97B29" letter-spacing="4" font-weight="bold">验证 · 下一步实验</text>
+    <text x="64" y="118" font-family="Georgia, SimSun, serif" font-size="42" font-weight="bold" fill="#1E4D40">是否省时，是否增加误判</text>
+    <line x1="64" y1="142" x2="1216" y2="142" stroke="#D8DED6" stroke-width="1"/>
+  </g>
+
+  <g id="experiment">
+    <rect x="64" y="172" width="1152" height="90" fill="#F0F2ED"/>
+    <text x="96" y="212" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" font-weight="bold" fill="#1E4D40" letter-spacing="2">对照实验</text>
+    <text x="96" y="244" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="20" fill="#22302B">同一批经授权、脱敏的反馈——人工整理 vs OneCase 辅助整理，逐条对照测量</text>
+  </g>
+
+  <g id="pillar-main">
+    <line x1="64" y1="310" x2="416" y2="310" stroke="#1E4D40" stroke-width="3"/>
+    <use data-icon="tabler-outline/target" x="64" y="336" width="32" height="32" fill="#1E4D40" stroke-width="2"/>
+    <text x="64" y="424" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="24" font-weight="bold" fill="#22302B">主要指标 · 速度</text>
+    <text x="64" y="476" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#5C6B64">从原始反馈到确认事项的</text>
+    <text x="64" y="506" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#5C6B64">中位耗时。</text>
+    <text x="64" y="560" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#8A968F">是否真的省时间</text>
+  </g>
+
+  <g id="pillar-quality">
+    <line x1="448" y1="310" x2="800" y2="310" stroke="#1E4D40" stroke-width="3"/>
+    <use data-icon="tabler-outline/chart-bar" x="448" y="336" width="32" height="32" fill="#1E4D40" stroke-width="2"/>
+    <text x="448" y="424" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="24" font-weight="bold" fill="#22302B">质量指标 · 准确</text>
+    <text x="448" y="476" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#5C6B64">漏项、关键字段错误、</text>
+    <text x="448" y="506" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#5C6B64">误关联、人工修改次数。</text>
+    <text x="448" y="560" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#8A968F">是否引入新的错误</text>
+  </g>
+
+  <g id="pillar-ops">
+    <line x1="832" y1="310" x2="1184" y2="310" stroke="#1E4D40" stroke-width="3"/>
+    <use data-icon="tabler-outline/bolt" x="832" y="336" width="32" height="32" fill="#1E4D40" stroke-width="2"/>
+    <text x="832" y="424" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="24" font-weight="bold" fill="#22302B">运行指标 · 成本</text>
+    <text x="832" y="476" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#5C6B64">模型失败率、人工兜底</text>
+    <text x="832" y="506" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#5C6B64">频次、单次使用成本。</text>
+    <text x="832" y="560" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#8A968F">跑起来贵不贵</text>
+  </g>
+
+  <g id="pillar-separators">
+    <line x1="432" y1="310" x2="432" y2="580" stroke="#D8DED6" stroke-width="1"/>
+    <line x1="816" y1="310" x2="816" y2="580" stroke="#D8DED6" stroke-width="1"/>
+  </g>
+
+  <g id="conclusion">
+    <line x1="64" y1="610" x2="1216" y2="610" stroke="#D8DED6" stroke-width="1"/>
+    <text x="64" y="656" font-family="Georgia, SimSun, serif" font-size="24" fill="#1E4D40">验收阈值与场景方共同确定；是否继续投入，由实测数据决定。</text>
+  </g>
+
+  <g id="footer">
+    <text x="64" y="700" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#8A968F">OneCase · 初赛路演</text>
+    <text x="1216" y="700" text-anchor="end" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#8A968F">11 / 14</text>
+  </g>
+</svg>

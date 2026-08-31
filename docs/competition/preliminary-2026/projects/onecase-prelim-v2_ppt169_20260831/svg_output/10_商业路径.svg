@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <rect width="1280" height="720" fill="#FAFAF7"/>
+
+  <g id="header">
+    <text x="64" y="76" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#D97B29" letter-spacing="4" font-weight="bold">商业 · 落地路径</text>
+    <text x="64" y="118" font-family="Georgia, SimSun, serif" font-size="42" font-weight="bold" fill="#1E4D40">从一个受控场景开始</text>
+    <line x1="64" y1="142" x2="1216" y2="142" stroke="#D8DED6" stroke-width="1"/>
+  </g>
+
+  <g id="chevrons">
+    <polygon points="64,180 444,180 474,215 444,250 64,250" fill="#F0F2ED" stroke="#1E4D40" stroke-width="1.5"/>
+    <text x="244" y="212" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#5C6B64" letter-spacing="2">STEP 01</text>
+    <text x="244" y="238" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="20" font-weight="bold" fill="#1E4D40">场景共建</text>
+    <polygon points="444,180 824,180 854,215 824,250 444,250 474,215" fill="#F0F2ED" stroke="#1E4D40" stroke-width="1.5"/>
+    <text x="634" y="212" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#5C6B64" letter-spacing="2">STEP 02</text>
+    <text x="634" y="238" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="20" font-weight="bold" fill="#1E4D40">流程验证</text>
+    <polygon points="824,180 1186,180 1216,215 1186,250 824,250 854,215" fill="#1E4D40"/>
+    <text x="1010" y="212" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#5E8C7B" letter-spacing="2">STEP 03</text>
+    <text x="1010" y="238" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="20" font-weight="bold" fill="#FAFAF7">服务采购</text>
+  </g>
+
+  <g id="factor-frame">
+    <line x1="640" y1="300" x2="640" y2="600" stroke="#D8DED6" stroke-width="1"/>
+    <line x1="64" y1="450" x2="1216" y2="450" stroke="#D8DED6" stroke-width="1"/>
+  </g>
+
+  <g id="factor-user">
+    <use data-icon="tabler-outline/users" x="64" y="320" width="30" height="30" fill="#1E4D40" stroke-width="2"/>
+    <text x="110" y="344" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="22" font-weight="bold" fill="#22302B">使用者</text>
+    <text x="64" y="392" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#5C6B64">社区工作人员与网格员——</text>
+    <text x="64" y="420" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#5C6B64">每天处理居民反馈的人。</text>
+  </g>
+
+  <g id="factor-payer">
+    <text x="704" y="344" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="22" font-weight="bold" fill="#22302B">潜在付费方</text>
+    <text x="704" y="392" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#5C6B64">社区服务运营主体——</text>
+    <text x="704" y="420" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#5C6B64">预算与采购路径需验证。</text>
+  </g>
+
+  <g id="factor-revenue">
+    <use data-icon="tabler-outline/coins" x="64" y="480" width="30" height="30" fill="#1E4D40" stroke-width="2"/>
+    <text x="110" y="504" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="22" font-weight="bold" fill="#22302B">候选收入</text>
+    <text x="64" y="552" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#5C6B64">部署与配置服务费 +</text>
+    <text x="64" y="580" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#5C6B64">持续运维服务费。</text>
+  </g>
+
+  <g id="factor-cost">
+    <use data-icon="tabler-outline/settings" x="704" y="480" width="30" height="30" fill="#1E4D40" stroke-width="2"/>
+    <text x="750" y="504" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="22" font-weight="bold" fill="#22302B">主要成本</text>
+    <text x="704" y="552" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#5C6B64">模型调用、部署、</text>
+    <text x="704" y="580" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#5C6B64">安全合规与用户支持。</text>
+  </g>
+
+  <g id="note">
+    <line x1="64" y1="628" x2="1216" y2="628" stroke="#D8DED6" stroke-width="1"/>
+    <text x="64" y="664" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#8A968F">商业化目前为待验证方案：先在真实流程中证明价值，再谈服务收费——当前无已验证价格、合同或收入。</text>
+  </g>
+
+  <g id="footer">
+    <text x="64" y="700" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#8A968F">OneCase · 初赛路演</text>
+    <text x="1216" y="700" text-anchor="end" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#8A968F">10 / 14</text>
+  </g>
+</svg>

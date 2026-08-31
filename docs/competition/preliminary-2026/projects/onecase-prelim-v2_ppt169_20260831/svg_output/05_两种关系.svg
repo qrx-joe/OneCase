@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <defs>
+    <marker id="arrowHead" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#5E8C7B"/>
+    </marker>
+  </defs>
+  <rect width="1280" height="720" fill="#FAFAF7"/>
+
+  <g id="header">
+    <text x="64" y="76" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#D97B29" letter-spacing="4" font-weight="bold">机制 · 拆分与关联</text>
+    <text x="64" y="118" font-family="Georgia, SimSun, serif" font-size="42" font-weight="bold" fill="#1E4D40">拆开问题，汇拢来源</text>
+    <line x1="64" y1="142" x2="1216" y2="142" stroke="#D8DED6" stroke-width="1"/>
+  </g>
+
+  <g id="split-diagram">
+    <use data-icon="tabler-outline/arrows-split-2" x="64" y="172" width="28" height="28" fill="#1E4D40" stroke-width="2"/>
+    <text x="104" y="194" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" font-weight="bold" fill="#22302B">拆开 · 一条反馈 → 多个事项草稿</text>
+    <rect x="252" y="222" width="170" height="60" fill="#F0F2ED"/>
+    <text x="337" y="260" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="20" fill="#22302B">居民反馈 A</text>
+    <line x1="310" y1="282" x2="200" y2="416" stroke="#5E8C7B" stroke-width="1.5" marker-end="url(#arrowHead)"/>
+    <line x1="364" y1="282" x2="474" y2="416" stroke="#5E8C7B" stroke-width="1.5" marker-end="url(#arrowHead)"/>
+    <rect x="97" y="424" width="190" height="60" fill="#1E4D40"/>
+    <text x="192" y="462" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#FAFAF7">草稿 1 · 照明</text>
+    <rect x="387" y="424" width="190" height="60" fill="#1E4D40"/>
+    <text x="482" y="462" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#FAFAF7">草稿 2 · 清运</text>
+  </g>
+
+  <g id="merge-diagram">
+    <use data-icon="tabler-outline/link" x="704" y="172" width="28" height="28" fill="#1E4D40" stroke-width="2"/>
+    <text x="744" y="194" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" font-weight="bold" fill="#22302B">汇拢 · 多条反馈 → 同一事项</text>
+    <rect x="712" y="222" width="170" height="60" fill="#F0F2ED"/>
+    <text x="797" y="260" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="20" fill="#22302B">反馈 A</text>
+    <rect x="998" y="222" width="170" height="60" fill="#F0F2ED"/>
+    <text x="1083" y="260" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="20" fill="#22302B">反馈 B</text>
+    <line x1="830" y1="282" x2="920" y2="416" stroke="#5E8C7B" stroke-width="1.5" marker-end="url(#arrowHead)"/>
+    <line x1="1050" y1="282" x2="960" y2="416" stroke="#5E8C7B" stroke-width="1.5" marker-end="url(#arrowHead)"/>
+    <text x="943" y="352" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" font-weight="bold" fill="#D97B29">人工确认</text>
+    <rect x="843" y="424" width="200" height="60" fill="#1E4D40"/>
+    <text x="943" y="462" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#FAFAF7">同一事项 + 来源</text>
+  </g>
+
+  <g id="divider">
+    <line x1="640" y1="172" x2="640" y2="500" stroke="#D8DED6" stroke-width="1"/>
+  </g>
+
+  <g id="basis-note">
+    <line x1="64" y1="546" x2="1216" y2="546" stroke="#D8DED6" stroke-width="1"/>
+    <text x="64" y="584" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" font-weight="bold" fill="#1E4D40" letter-spacing="2">候选依据</text>
+    <rect x="64" y="602" width="96" height="34" fill="#F0F2ED"/>
+    <text x="112" y="625" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#22302B">标题词汇</text>
+    <rect x="172" y="602" width="64" height="34" fill="#F0F2ED"/>
+    <text x="204" y="625" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#22302B">地点</text>
+    <rect x="248" y="602" width="64" height="34" fill="#F0F2ED"/>
+    <text x="280" y="625" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#22302B">类别</text>
+    <rect x="324" y="602" width="64" height="34" fill="#F0F2ED"/>
+    <text x="356" y="625" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#22302B">时间</text>
+    <text x="440" y="616" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#5C6B64">候选展示匹配依据；地点不同会给出提示——</text>
+    <text x="440" y="644" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#5C6B64">系统不自动合并，最终由人核对。</text>
+  </g>
+
+  <g id="footer">
+    <text x="64" y="700" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#8A968F">OneCase · 初赛路演</text>
+    <text x="1216" y="700" text-anchor="end" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#8A968F">05 / 14</text>
+  </g>
+</svg>

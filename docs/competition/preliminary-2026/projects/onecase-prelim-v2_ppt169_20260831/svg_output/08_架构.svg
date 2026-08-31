@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <rect width="1280" height="720" fill="#FAFAF7"/>
+
+  <g id="header">
+    <text x="64" y="76" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#D97B29" letter-spacing="4" font-weight="bold">架构 · 分层职责</text>
+    <text x="64" y="118" font-family="Georgia, SimSun, serif" font-size="42" font-weight="bold" fill="#1E4D40">模型提取与业务规则，各归其位</text>
+    <line x1="64" y1="142" x2="1216" y2="142" stroke="#D8DED6" stroke-width="1"/>
+  </g>
+
+  <g id="layer-web">
+    <rect x="64" y="168" width="200" height="88" fill="#1E4D40"/>
+    <text x="164" y="206" text-anchor="middle" font-family="Georgia, SimSun, serif" font-size="24" font-weight="bold" fill="#FAFAF7">01</text>
+    <text x="164" y="236" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#FAFAF7">Web 工作台</text>
+    <rect x="280" y="168" width="936" height="88" fill="#F0F2ED" fill-opacity="0.5"/>
+    <text x="432" y="220" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#22302B">输入</text>
+    <line x1="592" y1="168" x2="592" y2="256" stroke="#D8DED6" stroke-width="1"/>
+    <text x="744" y="220" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#22302B">草稿检查</text>
+    <line x1="904" y1="168" x2="904" y2="256" stroke="#D8DED6" stroke-width="1"/>
+    <text x="1056" y="220" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#22302B">事项跟踪</text>
+  </g>
+
+  <g id="layer-ai">
+    <rect x="64" y="272" width="200" height="88" fill="#1E4D40"/>
+    <use data-icon="tabler-outline/cpu" x="150" y="284" width="28" height="28" fill="#FAFAF7" stroke-width="2"/>
+    <text x="164" y="348" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#FAFAF7">AI 适配</text>
+    <rect x="280" y="272" width="936" height="88" fill="#F0F2ED" fill-opacity="0.5"/>
+    <text x="432" y="324" text-anchor="middle" font-family="Consolas, 'Courier New', monospace" font-size="18" fill="#22302B">Mock</text>
+    <line x1="592" y1="272" x2="592" y2="360" stroke="#D8DED6" stroke-width="1"/>
+    <text x="744" y="324" text-anchor="middle" font-family="Consolas, 'Courier New', monospace" font-size="18" fill="#22302B">Qwen</text>
+    <line x1="904" y1="272" x2="904" y2="360" stroke="#D8DED6" stroke-width="1"/>
+    <text x="1056" y="324" text-anchor="middle" font-family="Consolas, 'Courier New', monospace" font-size="18" fill="#22302B">OpenAI</text>
+  </g>
+
+  <g id="layer-biz">
+    <rect x="64" y="376" width="200" height="88" fill="#1E4D40"/>
+    <text x="164" y="414" text-anchor="middle" font-family="Georgia, SimSun, serif" font-size="24" font-weight="bold" fill="#FAFAF7">03</text>
+    <text x="164" y="444" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#FAFAF7">业务控制</text>
+    <rect x="280" y="376" width="936" height="88" fill="#F0F2ED" fill-opacity="0.5"/>
+    <text x="375" y="428" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" font-weight="bold" fill="#22302B">Schema 校验</text>
+    <line x1="514" y1="376" x2="514" y2="464" stroke="#D8DED6" stroke-width="1"/>
+    <text x="609" y="428" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" font-weight="bold" fill="#22302B">候选排序</text>
+    <line x1="704" y1="376" x2="704" y2="464" stroke="#D8DED6" stroke-width="1"/>
+    <text x="829" y="428" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" font-weight="bold" fill="#22302B">人工确认门禁</text>
+    <line x1="982" y1="376" x2="982" y2="464" stroke="#D8DED6" stroke-width="1"/>
+    <text x="1099" y="428" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" font-weight="bold" fill="#22302B">状态机</text>
+  </g>
+
+  <g id="layer-data">
+    <rect x="64" y="480" width="200" height="88" fill="#1E4D40"/>
+    <use data-icon="tabler-outline/database" x="150" y="492" width="28" height="28" fill="#FAFAF7" stroke-width="2"/>
+    <text x="164" y="556" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#FAFAF7">数据记录</text>
+    <rect x="280" y="480" width="936" height="88" fill="#F0F2ED" fill-opacity="0.5"/>
+    <text x="347" y="532" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#22302B">原始反馈</text>
+    <line x1="429" y1="480" x2="429" y2="568" stroke="#D8DED6" stroke-width="1"/>
+    <text x="496" y="532" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#22302B">草稿</text>
+    <line x1="563" y1="480" x2="563" y2="568" stroke="#D8DED6" stroke-width="1"/>
+    <text x="630" y="532" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#22302B">事项</text>
+    <line x1="697" y1="480" x2="697" y2="568" stroke="#D8DED6" stroke-width="1"/>
+    <text x="764" y="532" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#22302B">来源</text>
+    <line x1="831" y1="480" x2="831" y2="568" stroke="#D8DED6" stroke-width="1"/>
+    <text x="948" y="532" text-anchor="middle" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#22302B">处理记录</text>
+  </g>
+
+  <g id="stack-note">
+    <line x1="64" y1="600" x2="1216" y2="600" stroke="#D8DED6" stroke-width="1"/>
+    <text x="64" y="640" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" font-weight="bold" fill="#1E4D40" letter-spacing="2">技术基础</text>
+    <text x="180" y="640" font-family="Consolas, 'Courier New', monospace" font-size="18" fill="#22302B">Next.js · React · TypeScript · Zod · Prisma · SQLite</text>
+    <text x="1216" y="640" text-anchor="end" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#8A968F">真实模型效果需专项实测 · 重复候选未用 Embedding</text>
+  </g>
+
+  <g id="footer">
+    <text x="64" y="690" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#8A968F">OneCase · 初赛路演</text>
+    <text x="1216" y="690" text-anchor="end" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#8A968F">08 / 14</text>
+  </g>
+</svg>

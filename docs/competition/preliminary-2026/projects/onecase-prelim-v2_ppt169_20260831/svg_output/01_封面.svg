@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <rect width="1280" height="720" fill="#FAFAF7"/>
+
+  <g id="masthead">
+    <text x="64" y="44" font-family="Georgia, SimSun, serif" font-size="16" fill="#5C6B64" letter-spacing="2">江岸计划 · AI 黑客松创新大赛</text>
+    <text x="1216" y="44" text-anchor="end" font-family="Georgia, SimSun, serif" font-size="16" fill="#5C6B64" letter-spacing="3">PRELIMINARY · 2026</text>
+    <line x1="64" y1="58" x2="1216" y2="58" stroke="#1E4D40" stroke-width="3"/>
+    <line x1="64" y1="66" x2="1216" y2="66" stroke="#D8DED6" stroke-width="1"/>
+  </g>
+
+  <g id="kicker">
+    <text x="64" y="140" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#D97B29" letter-spacing="5" font-weight="bold">AI+民生赛道 · 参赛团队 不理不器</text>
+  </g>
+
+  <g id="title-block">
+    <text x="60" y="262" font-family="Georgia, SimSun, serif" font-size="72" font-weight="bold" fill="#1E4D40">OneCase</text>
+    <text x="64" y="330" font-family="Georgia, SimSun, serif" font-size="32" fill="#22302B">把居民反馈，整理成可追踪的社区事项</text>
+  </g>
+
+  <g id="standfirst">
+    <line x1="64" y1="408" x2="64" y2="512" stroke="#D97B29" stroke-width="4"/>
+    <text x="96" y="444" font-family="Georgia, SimSun, serif" font-size="28" fill="#22302B">“三栋二单元的灯又坏了……另外楼下垃圾今天也没人清。”</text>
+    <text x="96" y="492" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#5C6B64">—— 一条居民留言（合成示例）。OneCase 要把它整理成两件可分别追踪的事。</text>
+  </g>
+
+  <g id="footer">
+    <line x1="64" y1="648" x2="1216" y2="648" stroke="#D8DED6" stroke-width="1"/>
+    <text x="64" y="686" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#5C6B64">乔瑞雪 · 不理不器 · 个人参赛</text>
+    <text x="1216" y="686" text-anchor="end" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#8A968F">2026 年 9 月 · 南京</text>
+  </g>
+</svg>

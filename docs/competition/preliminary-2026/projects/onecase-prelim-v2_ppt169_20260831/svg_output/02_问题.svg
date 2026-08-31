@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <rect width="1280" height="720" fill="#FAFAF7"/>
+
+  <g id="header">
+    <text x="64" y="76" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#D97B29" letter-spacing="4" font-weight="bold">问题 · 整理环节的重复劳动</text>
+    <text x="64" y="118" font-family="Georgia, SimSun, serif" font-size="42" font-weight="bold" fill="#1E4D40">一条居民留言，藏着两件事</text>
+    <line x1="64" y1="142" x2="1216" y2="142" stroke="#D8DED6" stroke-width="1"/>
+  </g>
+
+  <g id="item-1">
+    <text x="64" y="212" font-family="Georgia, SimSun, serif" font-size="32" font-weight="bold" fill="#1E4D40">01</text>
+    <text x="150" y="206" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="24" font-weight="bold" fill="#22302B">一条消息</text>
+    <text x="150" y="240" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#5C6B64">灯坏了、垃圾没人清——可能包含多个需要分别处理、分别跟进的问题。</text>
+    <line x1="64" y1="278" x2="820" y2="278" stroke="#E4E8E1" stroke-width="1"/>
+  </g>
+
+  <g id="item-2">
+    <text x="64" y="352" font-family="Georgia, SimSun, serif" font-size="32" font-weight="bold" fill="#1E4D40">02</text>
+    <text x="150" y="346" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="24" font-weight="bold" fill="#22302B">不同居民</text>
+    <text x="150" y="380" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#5C6B64">可能重复反映同一个问题——不应只因消息不同，就重复建档。</text>
+    <line x1="64" y1="418" x2="820" y2="418" stroke="#E4E8E1" stroke-width="1"/>
+  </g>
+
+  <g id="item-3">
+    <text x="64" y="492" font-family="Georgia, SimSun, serif" font-size="32" font-weight="bold" fill="#1E4D40">03</text>
+    <text x="150" y="486" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="24" font-weight="bold" fill="#22302B">工作人员</text>
+    <text x="150" y="520" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#5C6B64">需要拆分、查重，再誊入台账——在聊天记录与台账之间来回搬运。</text>
+  </g>
+
+  <g id="sidebar-users">
+    <rect x="880" y="180" width="336" height="200" fill="#F0F2ED"/>
+    <use data-icon="tabler-outline/users" x="912" y="208" width="36" height="36" fill="#1E4D40" stroke-width="2"/>
+    <text x="912" y="288" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" font-weight="bold" fill="#5C6B64" letter-spacing="2">直接用户</text>
+    <text x="912" y="324" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="24" font-weight="bold" fill="#22302B">社区工作人员 · 网格员</text>
+    <text x="912" y="356" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#8A968F">居民是信息来源，暂不需要操作</text>
+  </g>
+
+  <g id="sidebar-note">
+    <line x1="880" y1="420" x2="880" y2="560" stroke="#D97B29" stroke-width="3"/>
+    <text x="904" y="452" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" font-weight="bold" fill="#1E4D40" letter-spacing="2">如实说明</text>
+    <text x="904" y="488" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#5C6B64">问题在真实社区中的频率与</text>
+    <text x="904" y="516" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="18" fill="#5C6B64">成本尚未实测，属待验证假设。</text>
+  </g>
+
+  <g id="footer">
+    <text x="64" y="686" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#8A968F">OneCase · 初赛路演</text>
+    <text x="1216" y="686" text-anchor="end" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="16" fill="#8A968F">02 / 14</text>
+  </g>
+</svg>
