@@ -27,6 +27,41 @@ async function callAnalyze(id: string) {
   return { status: res.status, body: await res.json() }
 }
 
+/**
+ * 清理 other-community 测试组织及其全部数据。
+ * schema 未定义外键,按依赖顺序手动删除;db:reset 只清业务行不清 Organization,
+ * 不清理会把跨组织数据永久留在 Demo 基线里 (codex P2-4)。
+ */
+async function cleanupOtherCommunity() {
+  const org = await prisma.organization.findUnique({ where: { slug: 'other-community' } })
+  if (!org) return
+
+  const intakes = await prisma.intake.findMany({ where: { organizationId: org.id }, select: { id: true } })
+  const intakeIds = intakes.map((i) => i.id)
+  if (intakeIds.length > 0) {
+    const analyses = await prisma.intakeAnalysis.findMany({
+      where: { intakeId: { in: intakeIds } },
+      select: { id: true },
+    })
+    const analysisIds = analyses.map((a) => a.id)
+    if (analysisIds.length > 0) {
+      await prisma.intakeIssue.deleteMany({ where: { analysisId: { in: analysisIds } } })
+    }
+    await prisma.intakeAnalysis.deleteMany({ where: { intakeId: { in: intakeIds } } })
+    await prisma.attachment.deleteMany({ where: { intakeId: { in: intakeIds } } })
+  }
+  const cases = await prisma.case.findMany({ where: { organizationId: org.id }, select: { id: true } })
+  const caseIds = cases.map((c) => c.id)
+  await prisma.caseSource.deleteMany({
+    where: { OR: [{ caseId: { in: caseIds } }, { intakeId: { in: intakeIds } }] },
+  })
+  await prisma.caseAction.deleteMany({ where: { caseId: { in: caseIds } } })
+  await prisma.intake.deleteMany({ where: { organizationId: org.id } })
+  await prisma.case.deleteMany({ where: { organizationId: org.id } })
+  await prisma.category.deleteMany({ where: { organizationId: org.id } })
+  await prisma.organization.delete({ where: { id: org.id } })
+}
+
 async function snapshot() {
   return {
     cases: await prisma.case.count(),
@@ -70,7 +105,10 @@ async function createAnalyzedIntake(rawText: string) {
 async function main() {
   console.log('🧪 Confirm/手动兜底业务不变量\n')
   execSync('pnpm --filter @onecase/db db:reset', { stdio: 'inherit' })
+  // db:reset 不清 Organization: 先清掉历史运行遗留的 other-community,恢复 Demo 基线
+  await cleanupOtherCommunity()
 
+  try {
   // ============================================================
   // §3 Confirm 必须覆盖全部 Issue
   // ============================================================
@@ -367,12 +405,25 @@ async function main() {
   check('跨组织 LINK 被拒后零写入', beforeD.cases === afterD.cases && beforeD.sources === afterD.sources && dStatus === 'ANALYZED', JSON.stringify({ afterD, dStatus }))
 
   console.log('\n' + (failed === 0 ? '🎉 业务不变量全部通过!' : `❌ ${failed} 项未通过`))
-  await prisma.$disconnect()
-  process.exit(failed === 0 ? 0 : 1)
+  } finally {
+    // 测试自清理: 不把跨组织数据留在 Demo 基线 (codex P2-4)
+    await cleanupOtherCommunity()
+    const leftover = await prisma.organization.findUnique({ where: { slug: 'other-community' } })
+    if (leftover) {
+      failed++
+      console.log('  ❌ other-community 清理失败,Demo 基线被污染')
+    } else {
+      console.log('  🧹 other-community 已清理,Demo 基线恢复 (仅 demo-community)')
+    }
+    await prisma.$disconnect()
+  }
 }
 
-main().catch(async (e) => {
-  console.error('测试异常:', e)
-  await prisma.$disconnect()
-  process.exit(1)
-})
+main()
+  .then(() => process.exit(failed === 0 ? 0 : 1))
+  .catch(async (e) => {
+    console.error('测试异常:', e)
+    await cleanupOtherCommunity().catch(() => {})
+    await prisma.$disconnect()
+    process.exit(1)
+  })
