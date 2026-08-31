@@ -10,6 +10,7 @@
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
+    "test:invariants": "pnpm --filter @onecase/web test:invariants",
     "test:e2e": "pnpm --filter @onecase/web test:e2e",
     "test:e2e:ui": "pnpm --filter @onecase/web test:e2e:ui",
     "db:push": "pnpm --filter @onecase/db push",
