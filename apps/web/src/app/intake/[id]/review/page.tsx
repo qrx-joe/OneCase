@@ -54,6 +54,10 @@ export default function IntakeReviewPage() {
   const [dupErrors, setDupErrors] = useState<Record<number, boolean>>({})
   // 每个 Issue 最近一次候选查询使用的草稿值
   const lastQueryRef = useRef<Record<number, { title: string; location: string }>>({})
+  // edits 的 ref 镜像: 初始候选异步返回时读取"当前"编辑状态,避开闭包过期
+  const editsRef = useRef<Record<number, { title?: string; locationText?: string; suggestedPriority?: string }>>({})
+  // 每个 Issue 的候选查询版本号: 仅最新版本的结果可写回,迟到的旧响应一律丢弃
+  const queryVersionRef = useRef<Record<number, number>>({})
 
   useEffect(() => {
     async function load() {
@@ -72,8 +76,10 @@ export default function IntakeReviewPage() {
 
         // 2. 为每个 issue 并行获取 Duplicate 候选 (草稿字段直传评分)
         if (data.data.issues?.length > 0) {
+          const issuesInput = data.data.issues as Issue[]
+          const versions = issuesInput.map((_, idx) => queryVersionRef.current[idx] ?? 0)
           const allCandidates = await Promise.all(
-            data.data.issues.map(async (issue: Issue) => {
+            issuesInput.map(async (issue: Issue, idx: number) => {
               try {
                 const dupRes = await fetch('/api/duplicates/find', {
                   method: 'POST',
@@ -86,20 +92,39 @@ export default function IntakeReviewPage() {
                   }),
                 })
                 const dupData = await dupRes.json()
+                // 编辑触发的重查已接管 (版本号被顶替) → 丢弃初始结果
+                if ((queryVersionRef.current[idx] ?? 0) !== versions[idx]) return []
                 return dupRes.ok && dupData.data?.candidates ? dupData.data.candidates : []
               } catch {
                 return [] // Duplicate 检索失败不阻塞 Review
               }
             })
           )
-          setCandidates(allCandidates)
+          // 用户在初始候选返回前已编辑草稿 → 不回填旧值候选,标记过期交给刷新 effect 重查
+          const editedIdx = issuesInput
+            .map((_, idx) => idx)
+            .filter(
+              (idx) =>
+                editsRef.current[idx]?.title !== undefined ||
+                editsRef.current[idx]?.locationText !== undefined
+            )
+          setCandidates(allCandidates.map((list, idx) => (editedIdx.includes(idx) ? [] : list)))
           // 记录本次候选使用的草稿值,后续编辑据此判断是否过期
-          data.data.issues.forEach((issue: Issue, idx: number) => {
+          issuesInput.forEach((issue: Issue, idx: number) => {
             lastQueryRef.current[idx] = {
               title: issue.title,
               location: issue.locationText ?? '',
             }
           })
+          if (editedIdx.length > 0) {
+            setStaleCandidates((prev) => {
+              const next = { ...prev }
+              editedIdx.forEach((idx) => {
+                next[idx] = true
+              })
+              return next
+            })
+          }
         }
       } catch (e) {
         console.error('Load review failed:', e)
@@ -111,8 +136,9 @@ export default function IntakeReviewPage() {
     load()
   }, [intakeId])
 
-  // 草稿编辑使旧候选过期: 标记 stale、清除基于旧候选的 LINK 决策,
-  // debounce 600ms 后按人工编辑值重新检索 (避免每次按键都请求)
+  // 草稿编辑使旧候选立即失效: 清空展示、清除基于旧候选的 LINK 决策并标记过期,
+  // debounce 600ms 后按人工编辑值重新检索 (避免每次按键都请求);
+  // 版本号守卫: 仅最新一次查询的结果可写回,迟到旧响应一律丢弃 (防错合并)
   useEffect(() => {
     if (issues.length === 0) return
     const timers: ReturnType<typeof setTimeout>[] = []
@@ -122,9 +148,19 @@ export default function IntakeReviewPage() {
       if (!lastQuery) return
       const title = edits[idx]?.title ?? issue.title
       const location = edits[idx]?.locationText ?? issue.locationText ?? ''
-      if (title === lastQuery.title && location === lastQuery.location) return
+      const unchanged = title === lastQuery.title && location === lastQuery.location
+      // 值与上次查询一致且无进行中的刷新 → 候选仍然新鲜
+      // (值改回原样但刷新未完成时 unchanged 为真,仍需重查恢复候选)
+      if (unchanged && !staleCandidates[idx]) return
 
-      setStaleCandidates((prev) => ({ ...prev, [idx]: true }))
+      // 旧候选立即失效: 不允许基于旧值继续关联 (错合并风险)
+      setStaleCandidates((prev) => (prev[idx] ? prev : { ...prev, [idx]: true }))
+      setCandidates((prev) => {
+        if ((prev[idx] ?? []).length === 0) return prev
+        const next = [...prev]
+        next[idx] = []
+        return next
+      })
       setDecisions((prev) => {
         if (prev[idx]?.decision !== 'LINK_EXISTING') return prev
         const next = { ...prev }
@@ -132,8 +168,14 @@ export default function IntakeReviewPage() {
         return next
       })
 
+      // 顶替在途查询: 旧版本响应返回时直接丢弃
+      const version = (queryVersionRef.current[idx] ?? 0) + 1
+      queryVersionRef.current[idx] = version
+
       timers.push(
         setTimeout(async () => {
+          let ok = false
+          let list: DuplicateCandidate[] = []
           try {
             const res = await fetch('/api/duplicates/find', {
               method: 'POST',
@@ -146,32 +188,27 @@ export default function IntakeReviewPage() {
               }),
             })
             const data = await res.json()
-            const list: DuplicateCandidate[] =
-              res.ok && data.data?.candidates ? data.data.candidates : []
-            setCandidates((prev) => {
-              const next = [...prev]
-              next[idx] = list
-              return next
-            })
-            setDupErrors((prev) => ({ ...prev, [idx]: !res.ok }))
+            ok = res.ok
+            list = res.ok && data.data?.candidates ? data.data.candidates : []
           } catch {
-            // 检索失败不阻塞创建新 Case,但旧候选已清空,不得继续展示
-            setCandidates((prev) => {
-              const next = [...prev]
-              next[idx] = []
-              return next
-            })
-            setDupErrors((prev) => ({ ...prev, [idx]: true }))
-          } finally {
-            setStaleCandidates((prev) => ({ ...prev, [idx]: false }))
-            lastQueryRef.current[idx] = { title, location }
+            ok = false // 检索失败不阻塞创建新 Case,候选置空
           }
+          if (queryVersionRef.current[idx] !== version) return // 已被更新的查询接管
+
+          setCandidates((prev) => {
+            const next = [...prev]
+            next[idx] = list
+            return next
+          })
+          setDupErrors((prev) => ({ ...prev, [idx]: !ok }))
+          setStaleCandidates((prev) => (prev[idx] ? { ...prev, [idx]: false } : prev))
+          lastQueryRef.current[idx] = { title, location }
         }, 600)
       )
     })
 
     return () => timers.forEach((t) => clearTimeout(t))
-  }, [edits, issues])
+  }, [edits, issues, staleCandidates])
 
   const setDecision = useCallback((index: number, decision: Decision, targetCaseId?: string) => {
     setDecisions((prev) => ({
@@ -186,11 +223,15 @@ export default function IntakeReviewPage() {
         ...prev,
         [index]: { ...prev[index], [field]: value },
       }))
+      editsRef.current[index] = { ...editsRef.current[index], [field]: value }
     },
     []
   )
 
-  const allDecided = issues.length > 0 && issues.every((_, idx) => decisions[idx]?.decision)
+  const allChosen = issues.length > 0 && issues.every((_, idx) => decisions[idx]?.decision)
+  // 任一候选刷新在途 (stale) 时禁止提交: 旧候选已清空,基于新值的候选尚未就绪
+  const anyStale = issues.some((_, idx) => staleCandidates[idx])
+  const allDecided = allChosen && !anyStale
 
   const handleSubmit = async () => {
     if (!analysisId || !allDecided) return
@@ -289,7 +330,13 @@ export default function IntakeReviewPage() {
             onClick={handleSubmit}
             disabled={!allDecided || submitting}
           >
-            {submitting ? '提交中...' : allDecided ? '确认全部决策' : `还需处理 ${issues.length - Object.keys(decisions).length} 个事项`}
+            {submitting
+              ? '提交中...'
+              : !allChosen
+              ? `还需处理 ${issues.length - Object.keys(decisions).length} 个事项`
+              : anyStale
+              ? '候选刷新中...'
+              : '确认全部决策'}
           </Button>
         </div>
       </div>
@@ -424,7 +471,7 @@ export default function IntakeReviewPage() {
                   <h3>事项 {idx + 1} 的相似候选</h3>
                   <p>
                     {staleCandidates[idx]
-                      ? '草稿已修改,以下候选基于旧值,正在重新检索…'
+                      ? '草稿已修改,旧候选已失效,正在按新值重新检索…'
                       : '候选仅用于辅助判断，不会自动合并。评分未校准。'}
                   </p>
                 </div>
@@ -465,6 +512,7 @@ export default function IntakeReviewPage() {
                               : 'outline'
                           }
                           size="sm"
+                          disabled={staleCandidates[idx]}
                           onClick={() => setDecision(idx, 'LINK_EXISTING', c.caseId)}
                         >
                           关联此 Case
