@@ -1,17 +1,19 @@
 # OneCase 项目审查报告
 
 日期：2026-08-31
-基线：`main` / `2a12b03`（codex 复审 5 项整改完成后）
-方法：全量通读 apps/web 全部路由/服务/页面、packages 全部源码、seed/reset、CI、README 与 .env.example；对照 TASK.md 完成标准与 README 已知限制，区分「新问题」与「已声明/已授权推迟项」。
-验证状态（审查时实跑）：typecheck ✅ / 单测 63 ✅ / 不变量 34 项 ✅ / E2E 11/11 ✅ / 全仓 build ✅ / `pnpm install --frozen-lockfile` ✅
+原审查基线：`main` / `2a12b03`（上一轮 5 项整改提交后）。Codex 后续修复基于 `32aff8f`，结果见 §8。
+方法：全量通读 apps/web 全部路由/服务/页面、packages 全部源码、seed/reset、CI、README 与 .env.example；对照 TASK.md 完成标准与 README 已知限制，区分新问题、已声明限制和本轮范围外需求。
+原审查记录：typecheck ✅ / 不变量 34 项 ✅ / E2E 11/11 ✅ / 全仓 build ✅ / `pnpm install --frozen-lockfile` ✅。单测原记为 63 项有误，Codex 实跑全仓单测为 103 项；原 E2E 结果不能代替后续改动的复验。
+
+后续进度：§2、§3 保留原审查问题描述；Confirm 状态校验、输入上限、幂等冲突和旧链接兼容的修复见 §9。
 
 ---
 
 ## 1. 结论摘要
 
-核心链路（Intake → AI Draft → 人工决策 → Case → 状态流转 → Dashboard）的业务不变量已经过本周两轮整改后处于健康状态：Confirm 事务完整、手动兜底有门禁、analyze 有 CAS 抢占、Mock 降级有双开关、组织一致性和决策留痕均有服务端校验和回归测试，CI 已覆盖单测/不变量/E2E/build。
+核心链路已有 Confirm 事务、手动兜底门禁、analyze CAS、Mock 降级双开关、组织一致性和决策留痕校验。后续复审发现 CI 在建表前运行数据库测试，以及旧分析请求可在新请求接管后写入；Codex 已做本地修复和服务级回归，见 §8。CI 配置包含单测、不变量、E2E 和 build，最新远程运行结果仍待确认。
 
-不存在会立刻产生错误业务事实的 P1 问题。剩余问题集中在三类：
+原报告未覆盖上述两项问题，不能据此宣布整体整改通过验收。除 §8 的复验边界外，仍需处理以下问题：
 
 1. **边界与纵深**（P2×5）：详情/变更端点的组织归属不校验、confirm 缺两道纵深校验、遗留死页面、未完成 Review 的 Intake 无找回入口、rawText 无长度上限。
 2. **文档与代码漂移**（P3 多项）：.env.example 含 3 组未实现的环境变量、README 测试章节落后于现状、「语义相似度」措辞与实现不符。
@@ -32,7 +34,7 @@
 | `POST /api/cases/[id]/status`（status/route.ts:46） | 可变更任意组织的 Case 状态 |
 | `POST /api/intakes/[id]/analyze`、`/confirm` | 按 id 直查 Intake，confirm 内部有一致性校验（组织一致 ✓），但读取本身不过滤 |
 
-写路径中 confirm 的 LINK 目标与手动创建的 sourceIntake 已在事务内校验同组织（整改简报 §7 落地）；缺口集中在**读路径与状态变更**。在无认证的 Demo 下无实际影响，接入认证时这些端点是第一批要补归属校验的地方。
+写路径中 confirm 的 LINK 目标与手动创建的 sourceIntake 已在事务内校验同组织（整改简报 §7 落地）；缺口集中在**读路径与状态变更**。当前仅适合受控、无敏感数据的演示；公开访问或真实试点前，需要认证和基于当前身份的归属校验。
 
 ### P2-2 confirmIntake 缺两道纵深校验（defense in depth）
 
@@ -101,12 +103,14 @@ Review 页「丢弃」按钮只是 `router.push('/intake')`，Intake 停留在 A
 
 ---
 
-## 4. 与 TASK.md 的偏差（已授权推迟，验收措辞需注意）
+## 4. 与 TASK.md 的偏差（本轮范围外，不代表已完成验收）
+
+整改简报限制本轮修改范围，不代表用户取消原始需求或授权推迟全部未完成项。后续应由用户确认范围及验收标准。
 
 | 项 | 现状 | 说明 |
 |----|------|------|
 | Phase 3「canonical case text 生成 embedding + exact cosine」 | 未实现（词汇启发式替代） | 整改简报 §8 明确本轮禁做；但 TASK.md Phase 3 验收行未满足，**交接材料不应声称 Phase 3 完整收口**（e03e799 提交信息中的「Phase 3 收口」仅指 Eval 部分，措辞有歧义） |
-| Phase 4「6 种页面状态：含 permission denied、AI unavailable」 | permission denied 无认证可依托，未实现；AI unavailable 已有（错误态+手动兜底） | Phase 4 按演示口径完成，验收清单这两项属试点范围 |
+| Phase 4「6 种页面状态：含 permission denied、AI unavailable」 | permission denied 无认证可依托，未实现；AI unavailable 已有（错误态+手动兜底） | permission denied 仍未满足原验收标准；演示范围与试点范围需另行确认 |
 | Phase 1「Confirm Transaction、Optimistic Lock、Idempotency 在 domain」 | 实现于 apps/web（domain 只有状态机/优先级） | 功能达成、位置漂移，建议 ADR 记录 |
 | 多模态（图片输入） | 未实现 | TASK.md 问题 4 默认「是」，当前仅文字链路 |
 
@@ -122,13 +126,13 @@ Review 页「丢弃」按钮只是 `router.push('/intake')`，Intake 停留在 A
 | P2 测试污染 Demo 基线 | `ccacfea` | organizations 2→1 治愈，finally 自清理+自检 |
 | P2 模板缺降级开关 | `2a12b03` | .env.example 补 AI_ALLOW_MOCK_FALLBACK |
 
-遗留已知风险：F2 的「分析在途被兜底抢走后迟到收尾」内部窗口（claim 与 AI 调用之间）由事务守卫保证但无法端到端自动化（需在 provider 内注入暂停），仅覆盖可观测面。
+上述表格记录原整改提交，不代表后续复验全部通过。Codex 已在 provider 边界注入挂起响应，配合真实 SQLite 和路由 handler 自动验证接管后迟到成功及失败，见 §8；这属于服务级集成测试，不是浏览器或真实模型服务的端到端证明。
 
 ---
 
 ## 6. 建议处理顺序
 
-1. **P2-3 删死页面 + P3.1 文档漂移**（半天内，纯清理，零风险）
+1. **先完成 §8 的 CI 与并发修复复验**，再处理 P2-3 遗留页和 P3.1 文档漂移；遗留 URL 优先评估兼容跳转，并验证历史入口，不将删除页面称为零风险。
 2. **P2-4 待确认草稿入口**（试点工作队列，产品闭环最后一块）
 3. **P2-2 confirm 纵深校验**（十行级，加两条不变量用例）
 4. **P2-5 rawText 上限 + P3.4 幂等竞态**（输入健壮性一批做）
@@ -145,3 +149,54 @@ pnpm test:invariants
 pnpm --filter @onecase/web test:e2e
 pnpm -r build
 ```
+
+## 8. Codex 补充修复与验证
+
+### CI 初始化顺序
+
+- 修复前，在独立空数据库运行 `test:invariants`，`reset-demo.ts` 访问 `CaseAction` 时返回 `P2021`，复现建表顺序缺陷。
+- 将 `.github/workflows/ci.yml` 的 `db:push` 移至不变量测试之前。`db:reset` 继续只负责清数据和 seed。
+- 本机 Windows 对尚不存在的 SQLite 文件执行 `db:push` 报 `Schema engine error`。改由 Prisma Client 建立空白库并确认 `sqlite_master` 无表后，建表及不变量测试通过。生成客户端时另出现一次 Windows 引擎 DLL 占用警告；本轮未修改依赖或终止其他任务来消除此警告。
+- 以上验证覆盖空 schema 初始化和测试顺序，不代表已在全新 Linux runner 上跑通 CI。尚未提交或推送本轮修复。
+
+### 分析批次与迟到写入
+
+- 抢占时对读取到的 `updatedAt` 做 CAS，显式写入递增的 `claimedAt` 作为批次版本。此举也拒绝读取旧快照的请求在其他分析已完成后重新抢占。
+- 成功和失败收尾均在事务中校验 `id + ANALYZING + claimedAt`，先条件更新状态，再写 Analysis / Issues；写入失败时事务整体回滚。
+- 收尾版本同样递增，防止同一毫秒内失败重试复用旧版本。不新增表字段、不迁移数据库、不改变 API 响应结构。
+- `updatedAt` 在分析期间承担版本职责；未来如新增草稿编辑或其他 Intake 写入，必须评估这些更新对在途分析的失效作用。
+
+### 回归与证据边界
+
+- 新增挂起 provider 的四种接管场景：新分析接管、人工兜底接管，各覆盖旧请求迟到成功与失败。仅推进应用时钟，不等待十分钟，不修改旧批次的数据库时间戳。
+- 修复前，新分析接管场景共 6 项断言失败；修复后通过。人工兜底接管原已通过，本次保留回归保护。
+- 补测当前批次失败返回 502、FAILED 审计与 PENDING 回退、重试复用 Analysis，以及完成后的重复分析幂等。
+- 本轮实跑：全仓单测 **103/103**、业务不变量首轮 **52/52**；保留并行工作新增的失败重试检查后，再跑合并脚本 **67/67** 通过。typecheck、全仓 build、`git diff --check` 通过。build 存在既有 Tailwind 配置模块格式警告，本轮未迁移样式体系。
+- 数据库测试使用工作区内独立临时库，没有重置原 Demo 数据。发现并行工作新增 E2E 文件并启动 3000 服务后，本轮没有再启动浏览器测试，避免争用同一个 `.next`；原报告的 11/11 仅保留为历史结果。
+
+### 结构影响与后续
+
+本轮修改 CI、analyze 路由、共享超时注释及服务级测试。Confirm、手动创建服务、数据库 schema、页面和原生 CSS 均未修改。待当前开发服务空闲后复跑 E2E，并在授权推送后检查新 CI；草稿找回入口、认证、输入限制等仍属于后续任务。
+
+## 9. 第二批边界修复（基于 33a2460）
+
+### 本轮修改
+
+- **P2-2 Confirm 门禁**：事务内要求 Intake 为 `ANALYZED`、Analysis 为 `COMPLETED`。不符合时 API 返回 422；已确认重复提交继续返回 409。保留已有的完整决策、组织一致性与原子写入校验。
+- **P2-5 输入校验**：contracts 新增 `CreateIntakeSchema`。拒绝空白、非字符串原文、错误字段类型和无效 JSON，新建原文上限为 10000 个 UTF-16 代码单元，与浏览器 `maxLength` 一致。校验不裁剪或改写原文；前端显示相同上限。未增加频控或请求体字节级限制。
+- **P3.4 幂等冲突**：组织别名先解析；同 key、同组织、同文本和来源重试返回同一 Intake。捕获并发创建的 P2002 后读取已创建结果，避免返回 500。不同载荷或不同组织复用 key 返回 409，不返回旧 Intake 内容。key 仍全局唯一，不新增数据库字段；此校验不能替代身份认证和归属授权。
+- **P2-3 旧入口兼容**：保留 `/intake/[id]`。PENDING / ANALYZING 跳到带 `intakeId` 的恢复页，ANALYZED 跳到 Review，CONFIRMED 跳到事项列表；不存在的 ID 继续返回 404。移除旧入口中提交到 JSON API 的错误 HTML 表单。
+
+### 回归证据
+
+- 修复前，新加的边界测试有 17 项失败，总计 70/87 通过；复现了错误输入、并发 key 冲突、不同请求复用 key 和未就绪分析生成 Case。
+- 修复后：业务不变量 **87/87**、全仓单测 **116/116**、typecheck 通过。并发测试使用真实 SQLite，同时发起 8 个同 key 请求，确认返回同一 Intake、只保存一行并保留原文。
+- E2E **22/22** 通过（58.4 秒，无重试）：包括黄金链路、草稿编辑、候选刷新、AI 失败后的重试与刷新恢复，以及新增旧入口四种状态、404、前后端长度上限检查。通过自动启动的新服务和独立 SQLite 测试，未复用其他开发服务；Mock / HTTP 故障注入不代表真实模型服务验收。
+- 前端不导入 contracts 校验代码来读取长度常量，避免将 Zod 带入新建页面；E2E 将浏览器 maxLength 与服务端常量比较，防止数值漂移。最终全仓构建通过，`/intake` 页面构建大小为 2.86 kB，First Load JS 为 98.2 kB；既有 Tailwind 配置模块格式警告仍在，未改样式工具链。`git diff --check` 通过。
+- 继续使用独立临时数据库，不重置原 Demo 库。未修改并行工作中的 `docs/competition/`。
+
+### 结构影响与剩余范围
+
+本轮涉及 contracts、Intake 创建 API、Confirm 服务及响应映射、Intake 页面和测试。保留数据库 schema、AI Provider、手动创建服务、Review 决策逻辑及原生 CSS；旧入口复用现有恢复流程，不另建状态机。
+
+待确认草稿队列、丢弃终态、认证与权限、频控仍未实现。此次只修复上述边界，不表示原报告所有问题或原 TASK 验收标准均已完成。

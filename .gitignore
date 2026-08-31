@@ -15,3 +15,15 @@ packages/db/prisma/*.db-journal
 # Playwright 运行产物
 apps/web/test-results
 apps/web/playwright-report
+# 本地工作目录与构建产物
+tmp/
+docs/tmp/
+# ppt-master 项目生成物(保留 spec/svg_output/notes 源文件)
+docs/competition/preliminary-2026/projects/*/exports/
+docs/competition/preliminary-2026/projects/*/backup/
+docs/competition/preliminary-2026/projects/*/svg_final/
+docs/competition/preliminary-2026/projects/*/confirm_ui/
+docs/competition/preliminary-2026/projects/*/live_preview/
+docs/competition/preliminary-2026/projects/*/analysis/
+*.confirm_ui.lock
+*.live_preview.lock
