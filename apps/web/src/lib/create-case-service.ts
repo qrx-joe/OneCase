@@ -6,6 +6,7 @@
 import { prisma } from '@/lib/prisma'
 import { resolveOrgId } from '@/lib/demo-context'
 import { generateCaseNumber } from '@/lib/case-number'
+import { STALE_ANALYZING_MS } from '@/lib/intake-status'
 
 export interface CreateCaseParams {
   title: string
@@ -27,10 +28,6 @@ export interface CreateCaseResult {
 }
 
 const VALID_PRIORITIES = new Set(['P1', 'P2', 'P3', 'UNKNOWN'])
-
-// ANALYZING 超过该时长视为分析进程已死亡,允许手动兜底
-// (最长在途请求 = 超时 30s × (1+重试) ≈ 90s,10 分钟阈值有充分余量)
-const STALE_ANALYZING_MS = 10 * 60 * 1000
 
 export async function createCaseManually(
   params: CreateCaseParams

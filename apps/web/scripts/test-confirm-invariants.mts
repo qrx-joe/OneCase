@@ -1,12 +1,14 @@
-// Confirm/手动兜底 业务不变量集成测试 (整改简报 §3/§4/§7)
+// Confirm/手动兜底 业务不变量集成测试 (整改简报 §3/§4/§7 + codex 复审 P1-2)
 // 直接调用服务层 + 真实 SQLite,构造 HTTP 无法构造的状态 (FAILED Analysis / 跨组织数据)
-// 运行: pnpm --filter @onecase/web exec tsx scripts/test-confirm-invariants.mts
+// 运行: pnpm --filter @onecase/web test:invariants
 // (脚本自带 db:reset,不需要 dev server)
 import { execSync } from 'child_process'
+import { NextRequest } from 'next/server'
 import { prisma } from '@onecase/db'
 import { confirmIntake } from '../src/lib/confirm-intake-service'
 import { createCaseManually } from '../src/lib/create-case-service'
 import { analyzeIntake } from '../src/lib/ai-provider'
+import { POST as analyzeRoute } from '../src/app/api/intakes/[id]/analyze/route'
 
 let failed = 0
 function check(name: string, cond: boolean, detail = '') {
@@ -16,6 +18,13 @@ function check(name: string, cond: boolean, detail = '') {
     failed++
     console.log(`  ❌ ${name} ${detail}`)
   }
+}
+
+/** 直接调用 analyze 路由 handler (绕过 HTTP,可测任意 DB 构造状态) */
+async function callAnalyze(id: string) {
+  const req = new NextRequest(`http://localhost/api/intakes/${id}/analyze`, { method: 'POST' })
+  const res = await analyzeRoute(req, { params: Promise.resolve({ id }) })
+  return { status: res.status, body: await res.json() }
 }
 
 async function snapshot() {
@@ -261,6 +270,54 @@ async function main() {
   check('卡死超时 (>10min) 的 ANALYZING 允许兜底', stuckFallback.success && !!stuckFallback.caseNumber, JSON.stringify(stuckFallback.errors))
   const stuckStatus = (await prisma.intake.findUnique({ where: { id: stuck.id } }))!.status
   check('卡死兜底后 Intake = CONFIRMED', stuckStatus === 'CONFIRMED', `实际 ${stuckStatus}`)
+
+  console.log('\n── §4-5 Analyze 门禁: CAS 抢占,在途/CONFIRMED 不可覆盖 ──')
+  // 在途 ANALYZING (updatedAt = 现在): 重复分析被拒,状态不被改动
+  const inprogress = await prisma.intake.create({
+    data: { organizationId: org!.id, sourceType: 'text', rawText: '另一个在途分析的反馈', status: 'ANALYZING' },
+  })
+  const dupAnalyze = await callAnalyze(inprogress.id)
+  check(
+    '在途 ANALYZING 重复分析被拒 (409 INTAKE_ANALYZE_IN_PROGRESS)',
+    dupAnalyze.status === 409 && dupAnalyze.body.error === 'INTAKE_ANALYZE_IN_PROGRESS',
+    JSON.stringify(dupAnalyze)
+  )
+  check(
+    '被拒后状态保持 ANALYZING (未被覆盖)',
+    (await prisma.intake.findUnique({ where: { id: inprogress.id } }))?.status === 'ANALYZING'
+  )
+  // 卡死超时 (>10min) ANALYZING: 可被新分析抢占,结果正常落库
+  const dead = await prisma.intake.create({
+    data: { organizationId: org!.id, sourceType: 'text', rawText: '分析进程崩溃遗留的反馈', status: 'ANALYZING' },
+  })
+  await prisma.intake.update({
+    where: { id: dead.id },
+    data: { updatedAt: new Date(Date.now() - 11 * 60 * 1000) },
+  })
+  const takeover = await callAnalyze(dead.id)
+  check('卡死 ANALYZING 可被抢占分析 (200)', takeover.status === 200, JSON.stringify(takeover))
+  const deadAfter = await prisma.intake.findUnique({ where: { id: dead.id } })
+  const deadAnalysis = await prisma.intakeAnalysis.findUnique({ where: { intakeId: dead.id } })
+  const deadIssues = await prisma.intakeIssue.findMany({ where: { analysisId: deadAnalysis?.id ?? '' } })
+  check(
+    '抢占后 Intake = ANALYZED + COMPLETED Analysis + Issues 落库',
+    deadAfter?.status === 'ANALYZED' && deadAnalysis?.status === 'COMPLETED' && deadIssues.length > 0,
+    JSON.stringify({ status: deadAfter?.status, analysis: deadAnalysis?.status, issues: deadIssues.length })
+  )
+  // CONFIRMED: 分析被拒,状态绝不被覆盖回 ANALYZING/ANALYZED
+  const confirmedDirect = await prisma.intake.create({
+    data: { organizationId: org!.id, sourceType: 'text', rawText: '已人工闭环的反馈', status: 'CONFIRMED' },
+  })
+  const confirmedAnalyze = await callAnalyze(confirmedDirect.id)
+  check(
+    'CONFIRMED Intake 拒绝分析 (409 INTAKE_ALREADY_CONFIRMED)',
+    confirmedAnalyze.status === 409 && confirmedAnalyze.body.error === 'INTAKE_ALREADY_CONFIRMED',
+    JSON.stringify(confirmedAnalyze)
+  )
+  check(
+    'CONFIRMED 状态未被覆盖',
+    (await prisma.intake.findUnique({ where: { id: confirmedDirect.id } }))?.status === 'CONFIRMED'
+  )
 
   // ============================================================
   // §7 组织一致性

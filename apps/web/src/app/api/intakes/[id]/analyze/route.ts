@@ -1,9 +1,12 @@
 // POST /api/intakes/[id]/analyze - 触发 AI 分析
 // 幂等: 已有 COMPLETED 分析直接返回;失败记录 FAILED (可重试,不重复占位)
+// 并发: CAS (条件 updateMany) 抢占分析权,同一 Intake 只有一个在途分析;
+//       成功/失败收尾均要求仍持有分析权 (ANALYZING),绝不覆盖 CONFIRMED 等人工结论
 // 审计: provider/model/latency 记录真实值;响应携带实际生效的 provider (Demo 降级可见)
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { analyzeIntake, getProviderInfo, resolveProviderConfig } from '@/lib/ai-provider'
+import { STALE_ANALYZING_MS } from '@/lib/intake-status'
 
 export async function POST(
   request: NextRequest,
@@ -68,11 +71,51 @@ export async function POST(
       })
     }
 
-    // 更新状态为 ANALYZING
-    await prisma.intake.update({
-      where: { id },
+    // CAS 抢占分析权: 仅 PENDING / ANALYZED (失败重试) / 卡死超时的 ANALYZING 可进入。
+    // 原子条件更新保证: 并发请求只有一个成功,CONFIRMED (人工已闭环) 永远不会被覆盖成 ANALYZING
+    const claimed = await prisma.intake.updateMany({
+      where: {
+        id,
+        OR: [
+          { status: { in: ['PENDING', 'ANALYZED'] } },
+          { status: 'ANALYZING', updatedAt: { lt: new Date(Date.now() - STALE_ANALYZING_MS) } },
+        ],
+      },
       data: { status: 'ANALYZING' },
     })
+
+    if (claimed.count === 0) {
+      const fresh = await prisma.intake.findUnique({
+        where: { id },
+        select: { status: true },
+      })
+      const status = fresh?.status
+      if (status === 'CONFIRMED') {
+        return NextResponse.json(
+          {
+            error: 'INTAKE_ALREADY_CONFIRMED',
+            message: '该 Intake 已确认,不能再分析',
+          },
+          { status: 409 }
+        )
+      }
+      if (status === 'ANALYZING') {
+        return NextResponse.json(
+          {
+            error: 'INTAKE_ANALYZE_IN_PROGRESS',
+            message: '该 Intake 正在分析中,请稍后',
+          },
+          { status: 409 }
+        )
+      }
+      return NextResponse.json(
+        {
+          error: 'INTAKE_NOT_ELIGIBLE_FOR_ANALYZE',
+          message: `当前状态 ${status ?? '未知'} 不允许分析`,
+        },
+        { status: 409 }
+      )
+    }
 
     // 调用 AI Provider (超时/重试/Schema 校验在 provider 层)
     // 注意: provider 装配也可能抛错 (配置错误且未授权 Mock 降级),同样走 FAILED 记录
@@ -105,32 +148,51 @@ export async function POST(
         modelVersion = 'unknown'
       }
 
-      // 记录失败分析 (intakeId 唯一约束: upsert 复用行,重试不冲突)
-      await prisma.intakeAnalysis.upsert({
-        where: { intakeId: id },
-        update: {
-          status: 'FAILED',
-          provider,
-          modelVersion,
-          latencyMs,
-          errorMessage,
-        },
-        create: {
-          intakeId: id,
-          provider,
-          modelVersion,
-          promptVersion: 'v1',
-          schemaVersion: 'v1',
-          status: 'FAILED',
-          latencyMs,
-          errorMessage,
-        },
+      // 收尾守卫: 仅当仍持有分析权 (ANALYZING) 才写 FAILED 并回退 PENDING。
+      // 分析期间被卡死接管的人工兜底已 CONFIRMED 时,迟到的失败不覆盖任何状态
+      const reverted = await prisma.$transaction(async (tx) => {
+        const cur = await tx.intake.findUnique({
+          where: { id },
+          select: { status: true },
+        })
+        if (!cur || cur.status !== 'ANALYZING') return false
+        await tx.intakeAnalysis.upsert({
+          where: { intakeId: id },
+          update: {
+            status: 'FAILED',
+            provider,
+            modelVersion,
+            latencyMs,
+            errorMessage,
+          },
+          create: {
+            intakeId: id,
+            provider,
+            modelVersion,
+            promptVersion: 'v1',
+            schemaVersion: 'v1',
+            status: 'FAILED',
+            latencyMs,
+            errorMessage,
+          },
+        })
+        await tx.intake.update({
+          where: { id },
+          data: { status: 'PENDING' },
+        })
+        return true
       })
-      // 回退 Intake 状态,允许重试/手动兜底
-      await prisma.intake.update({
-        where: { id },
-        data: { status: 'PENDING' },
-      })
+
+      if (!reverted) {
+        console.error(`Analyze 收尾放弃: Intake ${id} 已在分析期间被其他操作处理`)
+        return NextResponse.json(
+          {
+            error: 'INTAKE_STATE_CHANGED',
+            message: '该 Intake 已被其他操作处理,本次分析结果已丢弃',
+          },
+          { status: 409 }
+        )
+      }
 
       console.error('Analyze intake failed:', errorMessage)
       return NextResponse.json(
@@ -144,55 +206,79 @@ export async function POST(
     }
     const latencyMs = Date.now() - startedAt
 
-    // 创建/复用 Analysis (intakeId 唯一: 之前的 FAILED 行被复用为 COMPLETED)
-    const analysis = await prisma.intakeAnalysis.upsert({
-      where: { intakeId: id },
-      update: {
-        provider,
-        modelVersion,
-        status: 'COMPLETED',
-        latencyMs,
-        errorMessage: null,
-      },
-      create: {
-        intakeId: id,
-        provider,
-        modelVersion,
-        promptVersion: 'v1',
-        schemaVersion: 'v1',
-        status: 'COMPLETED',
-        latencyMs,
-      },
+    // 收尾守卫: 成功结果同样只在仍持有分析权 (ANALYZING) 时落库。
+    // 分析期间被卡死接管的人工兜底已 CONFIRMED 时,迟到结果整体丢弃,
+    // 不写 Analysis/Issues、不改状态,避免同一 Intake 被再次确认
+    const finalized = await prisma.$transaction(async (tx) => {
+      const cur = await tx.intake.findUnique({
+        where: { id },
+        select: { status: true },
+      })
+      if (!cur || cur.status !== 'ANALYZING') return null
+
+      // 创建/复用 Analysis (intakeId 唯一: 之前的 FAILED 行被复用为 COMPLETED)
+      const analysis = await tx.intakeAnalysis.upsert({
+        where: { intakeId: id },
+        update: {
+          provider,
+          modelVersion,
+          status: 'COMPLETED',
+          latencyMs,
+          errorMessage: null,
+        },
+        create: {
+          intakeId: id,
+          provider,
+          modelVersion,
+          promptVersion: 'v1',
+          schemaVersion: 'v1',
+          status: 'COMPLETED',
+          latencyMs,
+        },
+      })
+
+      // 创建 Issues
+      await tx.intakeIssue.createMany({
+        data: result.issues.map((issue, index) => ({
+          analysisId: analysis.id,
+          issueIndex: index,
+          title: issue.title,
+          summary: issue.summary || null,
+          categoryCode: issue.categoryCode || null,
+          locationText: issue.locationText || null,
+          impact: issue.impact,
+          urgency: issue.urgency,
+          affectedGroups: JSON.stringify(issue.affectedGroups || []),
+          riskSignals: JSON.stringify(issue.riskSignals || []),
+          missingInfo: JSON.stringify(issue.missingInformation || []),
+          evidenceConflict: issue.evidenceConflict || false,
+          suggestedPriority: issue.suggestedPriority || null,
+        })),
+      })
+
+      // 更新 Intake 状态 (此处必然从 ANALYZING 转移)
+      await tx.intake.update({
+        where: { id },
+        data: { status: 'ANALYZED' },
+      })
+
+      return analysis
     })
 
-    // 创建 Issues
-    await prisma.intakeIssue.createMany({
-      data: result.issues.map((issue, index) => ({
-        analysisId: analysis.id,
-        issueIndex: index,
-        title: issue.title,
-        summary: issue.summary || null,
-        categoryCode: issue.categoryCode || null,
-        locationText: issue.locationText || null,
-        impact: issue.impact,
-        urgency: issue.urgency,
-        affectedGroups: JSON.stringify(issue.affectedGroups || []),
-        riskSignals: JSON.stringify(issue.riskSignals || []),
-        missingInfo: JSON.stringify(issue.missingInformation || []),
-        evidenceConflict: issue.evidenceConflict || false,
-        suggestedPriority: issue.suggestedPriority || null,
-      })),
-    })
-
-    // 更新 Intake 状态
-    await prisma.intake.update({
-      where: { id },
-      data: { status: 'ANALYZED' },
-    })
+    if (!finalized) {
+      console.error(`Analyze 结果丢弃: Intake ${id} 已在分析期间被其他操作处理`)
+      return NextResponse.json(
+        {
+          error: 'INTAKE_STATE_CHANGED',
+          message: '该 Intake 已被其他操作处理,本次分析结果已丢弃',
+        },
+        { status: 409 }
+      )
+    }
 
     return NextResponse.json({
       data: {
-        analysisId: analysis.id,
+        analysisId: finalized.id,
         intakeId: id,
         provider,
         issues: result.issues,
