@@ -7,11 +7,14 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@onecase/db'
 import { confirmIntake } from '../src/lib/confirm-intake-service'
 import { createCaseManually } from '../src/lib/create-case-service'
-import { analyzeIntake } from '../src/lib/ai-provider'
+import { analyzeIntake, getExtractionProvider } from '../src/lib/ai-provider'
+import { STALE_ANALYZING_MS } from '../src/lib/intake-status'
 import { POST as analyzeRoute } from '../src/app/api/intakes/[id]/analyze/route'
 
 let failed = 0
+let checked = 0
 function check(name: string, cond: boolean, detail = '') {
+  checked++
   if (cond) {
     console.log(`  ✅ ${name}`)
   } else {
@@ -25,6 +28,127 @@ async function callAnalyze(id: string) {
   const req = new NextRequest(`http://localhost/api/intakes/${id}/analyze`, { method: 'POST' })
   const res = await analyzeRoute(req, { params: Promise.resolve({ id }) })
   return { status: res.status, body: await res.json() }
+}
+
+/** 真实 handler + SQLite: 失败、再次失败、恢复或人工兜底均复用同一 Intake。 */
+async function checkFailedAnalysisRetry(organizationId: string, recovery: 'analyze' | 'manual') {
+  const provider = getExtractionProvider()
+  const originalExtract = provider.extractCaseDraft
+  const rawText = '南门路灯杆被撞歪了。'
+  const intake = await prisma.intake.create({ data: { organizationId, sourceType: 'text', rawText } })
+  const before = { ...await snapshot(), intakes: await prisma.intake.count() }
+  const label = `分析失败重试 / ${recovery} 恢复`
+  try {
+    provider.extractCaseDraft = async () => { throw new Error('测试注入: AI 不可用') }
+    const first = await callAnalyze(intake.id)
+    const firstAnalysis = await prisma.intakeAnalysis.findUnique({ where: { intakeId: intake.id } })
+    const retry = await callAnalyze(intake.id)
+    const retriedAnalysis = await prisma.intakeAnalysis.findUnique({ where: { intakeId: intake.id } })
+    const pending = await prisma.intake.findUniqueOrThrow({ where: { id: intake.id } })
+    check(`${label}: 两次失败均返回 502`, first.status === 502 && retry.status === 502 && retry.body.error === 'AI_ANALYZE_FAILED')
+    check(`${label}: 原文保留且回退 PENDING`, pending.status === 'PENDING' && pending.rawText === rawText)
+    check(`${label}: 复用唯一 FAILED 审计`, !!firstAnalysis && retriedAnalysis?.id === firstAnalysis.id && retriedAnalysis?.status === 'FAILED' && retriedAnalysis?.errorMessage === '测试注入: AI 不可用')
+    check(`${label}: 无 Issue/Case/来源副作用`, await prisma.intakeIssue.count({ where: { analysisId: retriedAnalysis?.id ?? '' } }) === 0 && JSON.stringify(await snapshot()) === JSON.stringify({ cases: before.cases, sources: before.sources }))
+    provider.extractCaseDraft = originalExtract
+    if (recovery === 'analyze') {
+      const recovered = await callAnalyze(intake.id)
+      const repeated = await callAnalyze(intake.id)
+      const completed = await prisma.intakeAnalysis.findUnique({ where: { intakeId: intake.id } })
+      check(`${label}: 恢复后复用审计且清除错误`, recovered.status === 200 && repeated.status === 200 && completed?.id === firstAnalysis?.id && completed?.status === 'COMPLETED' && completed?.errorMessage === null)
+      check(`${label}: 成功重试不重复 Issue`, await prisma.intakeIssue.count({ where: { analysisId: completed?.id ?? '' } }) === recovered.body.data?.issues.length)
+      check(`${label}: 分析不自动创建 Case`, JSON.stringify(await snapshot()) === JSON.stringify({ cases: before.cases, sources: before.sources }))
+    } else {
+      const manual = await createCaseManually({ organizationId, title: '南门路灯杆倾斜', sourceIntakeId: intake.id })
+      const repeated = await createCaseManually({ organizationId, title: '重复兜底', sourceIntakeId: intake.id })
+      const sources = await prisma.caseSource.findMany({ where: { intakeId: intake.id } })
+      const confirmed = await prisma.intake.findUniqueOrThrow({ where: { id: intake.id } })
+      check(`${label}: 唯一 Case 关联原始 Intake`, manual.success && sources.length === 1 && sources[0].caseId === manual.id && confirmed.status === 'CONFIRMED' && confirmed.rawText === rawText && await prisma.case.count() === before.cases + 1)
+      check(`${label}: 重复人工提交被拒`, !repeated.success && repeated.errors.includes('INTAKE_ALREADY_CONFIRMED'))
+    }
+    check(`${label}: 未重复创建 Intake`, await prisma.intake.count() === before.intakes)
+  } finally {
+    provider.extractCaseDraft = originalExtract
+  }
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (error: Error) => void
+  const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no })
+  return { promise, resolve, reject }
+}
+
+/** 挂起真实 handler 的 provider 边界,用 SQLite 验证接管后迟到响应不能写入。 */
+async function checkLateAnalysis(organizationId: string, takeover: 'analyze' | 'manual', fails: boolean) {
+  const provider = getExtractionProvider()
+  const originalExtract = provider.extractCaseDraft
+  const originalNow = Date.now
+  type Output = Awaited<ReturnType<typeof originalExtract>>
+  const sample = await analyzeIntake('电梯异常')
+  const output = (title: string): Output => ({
+    ...sample, issues: [{ ...sample.issues[0], title }],
+  })
+  const oldResult = deferred<Output>()
+  const newResult = deferred<Output>()
+  const oldEntered = deferred<void>()
+  const newEntered = deferred<void>()
+  let calls = 0
+  const requests: Array<ReturnType<typeof callAnalyze>> = []
+  let deadline: ReturnType<typeof setTimeout> | undefined
+  const timedOut = new Promise<never>((_, reject) => {
+    deadline = setTimeout(() => reject(new Error('分析并发测试未到达 provider 边界')), 10000)
+  })
+  const label = `${takeover} 接管 / 旧请求${fails ? '失败' : '成功'}`
+  try {
+    provider.extractCaseDraft = () => {
+      calls++
+      if (calls === 1) { oldEntered.resolve(); return oldResult.promise }
+      newEntered.resolve()
+      return newResult.promise
+    }
+    const intake = await prisma.intake.create({
+      data: { organizationId, sourceType: 'text', rawText: label },
+    })
+    const oldRequest = callAnalyze(intake.id)
+    requests.push(oldRequest)
+    await Promise.race([oldEntered.promise, timedOut])
+    const claimed = await prisma.intake.findUniqueOrThrow({ where: { id: intake.id } })
+    // 推进应用时钟,不等待十分钟,也不篡改数据库中的旧批次版本。
+    Date.now = () => claimed.updatedAt.getTime() + STALE_ANALYZING_MS + 1
+    let newRequest: ReturnType<typeof callAnalyze> | undefined
+    if (takeover === 'analyze') {
+      newRequest = callAnalyze(intake.id)
+      requests.push(newRequest)
+      await Promise.race([newEntered.promise, timedOut])
+    } else {
+      const manual = await createCaseManually({ title: label, sourceIntakeId: intake.id, organizationId })
+      check(`${label}: 人工兜底成功`, manual.success, JSON.stringify(manual.errors))
+    }
+    if (fails) oldResult.reject(new Error('旧分析迟到失败'))
+    else oldResult.resolve(output('旧批次结果'))
+    const oldResponse = await oldRequest
+    check(`${label}: 旧请求返回 409`, oldResponse.status === 409 && oldResponse.body.error === 'INTAKE_STATE_CHANGED', JSON.stringify(oldResponse))
+    const afterOld = await prisma.intake.findUniqueOrThrow({ where: { id: intake.id } })
+    const analysisAfterOld = await prisma.intakeAnalysis.findUnique({ where: { intakeId: intake.id } })
+    check(`${label}: 旧请求零写入`, afterOld.status === (takeover === 'analyze' ? 'ANALYZING' : 'CONFIRMED') && analysisAfterOld === null)
+    if (newRequest) {
+      newResult.resolve(output('新批次结果'))
+      const response = await newRequest
+      const analysis = await prisma.intakeAnalysis.findUnique({ where: { intakeId: intake.id } })
+      const issues = await prisma.intakeIssue.findMany({ where: { analysisId: analysis?.id ?? '' } })
+      const final = await prisma.intake.findUniqueOrThrow({ where: { id: intake.id } })
+      check(`${label}: 仅新批次落库`, response.status === 200 && final.status === 'ANALYZED' && analysis?.status === 'COMPLETED' && issues.length === 1 && issues[0].title === '新批次结果')
+    } else {
+      check(`${label}: 人工来源仍唯一`, await prisma.caseSource.count({ where: { intakeId: intake.id } }) === 1)
+    }
+  } finally {
+    clearTimeout(deadline)
+    oldResult.resolve(output('清理旧请求'))
+    newResult.resolve(output('清理新请求'))
+    await Promise.allSettled(requests)
+    provider.extractCaseDraft = originalExtract
+    Date.now = originalNow
+  }
 }
 
 /**
@@ -358,6 +482,39 @@ async function main() {
   )
 
   // ============================================================
+  // §4-6 接管后迟到成功/失败: 新分析和人工兜底都不能被旧请求覆盖
+  for (const recovery of ['analyze', 'manual'] as const) {
+    await checkFailedAnalysisRetry(org!.id, recovery)
+  }
+  for (const takeover of ['analyze', 'manual'] as const) {
+    for (const fails of [false, true]) {
+      await checkLateAnalysis(org!.id, takeover, fails)
+    }
+  }
+
+  // 当前批次的失败仍须记审计并允许重试,不是把所有失败都当成迟到请求。
+  const provider = getExtractionProvider()
+  const originalExtract = provider.extractCaseDraft
+  try {
+    const retryIntake = await prisma.intake.create({
+      data: { organizationId: org!.id, sourceType: 'text', rawText: '电梯异常' },
+    })
+    provider.extractCaseDraft = async () => { throw new Error('当前批次失败') }
+    const failedResponse = await callAnalyze(retryIntake.id)
+    const failedAnalysis = await prisma.intakeAnalysis.findUnique({ where: { intakeId: retryIntake.id } })
+    const failedState = await prisma.intake.findUniqueOrThrow({ where: { id: retryIntake.id } })
+    check('当前批次失败返回 502', failedResponse.status === 502)
+    check('当前批次失败记审计并回退 PENDING', failedState.status === 'PENDING' && failedAnalysis?.status === 'FAILED')
+    provider.extractCaseDraft = originalExtract
+    const retryResponse = await callAnalyze(retryIntake.id)
+    const retriedAnalysis = await prisma.intakeAnalysis.findUnique({ where: { intakeId: retryIntake.id } })
+    check('失败后重试成功并复用 Analysis', retryResponse.status === 200 && retriedAnalysis?.status === 'COMPLETED' && retriedAnalysis.id === failedAnalysis?.id)
+    const repeated = await callAnalyze(retryIntake.id)
+    check('已完成分析重复调用仍幂等', repeated.status === 200 && repeated.body.data.analysisId === retriedAnalysis?.id)
+  } finally {
+    provider.extractCaseDraft = originalExtract
+  }
+
   // §7 组织一致性
   // ============================================================
   console.log('\n── §7-1 跨组织 sourceIntake 手动创建被拒 ──')
@@ -404,7 +561,7 @@ async function main() {
   const dStatus = (await prisma.intake.findUnique({ where: { id: d.intakeId } }))!.status
   check('跨组织 LINK 被拒后零写入', beforeD.cases === afterD.cases && beforeD.sources === afterD.sources && dStatus === 'ANALYZED', JSON.stringify({ afterD, dStatus }))
 
-  console.log('\n' + (failed === 0 ? '🎉 业务不变量全部通过!' : `❌ ${failed} 项未通过`))
+  console.log(`\n业务不变量: ${checked - failed}/${checked} 项通过`)
   } finally {
     // 测试自清理: 不把跨组织数据留在 Demo 基线 (codex P2-4)
     await cleanupOtherCommunity()

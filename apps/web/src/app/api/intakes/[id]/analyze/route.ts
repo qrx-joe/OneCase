@@ -1,7 +1,7 @@
 // POST /api/intakes/[id]/analyze - 触发 AI 分析
 // 幂等: 已有 COMPLETED 分析直接返回;失败记录 FAILED (可重试,不重复占位)
 // 并发: CAS (条件 updateMany) 抢占分析权,同一 Intake 只有一个在途分析;
-//       成功/失败收尾均要求仍持有分析权 (ANALYZING),绝不覆盖 CONFIRMED 等人工结论
+//       updatedAt 是本次抢占的版本,成功/失败收尾同时校验状态和版本
 // 审计: provider/model/latency 记录真实值;响应携带实际生效的 provider (Demo 降级可见)
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
@@ -73,15 +73,18 @@ export async function POST(
 
     // CAS 抢占分析权: 仅 PENDING / ANALYZED (失败重试) / 卡死超时的 ANALYZING 可进入。
     // 原子条件更新保证: 并发请求只有一个成功,CONFIRMED (人工已闭环) 永远不会被覆盖成 ANALYZING
+    // 显式递增版本,避免同一毫秒内重试复用旧批次;无须增加数据库字段。
+    const claimedAt = new Date(Math.max(Date.now(), intake.updatedAt.getTime() + 1))
     const claimed = await prisma.intake.updateMany({
       where: {
         id,
+        updatedAt: intake.updatedAt,
         OR: [
           { status: { in: ['PENDING', 'ANALYZED'] } },
           { status: 'ANALYZING', updatedAt: { lt: new Date(Date.now() - STALE_ANALYZING_MS) } },
         ],
       },
-      data: { status: 'ANALYZING' },
+      data: { status: 'ANALYZING', updatedAt: claimedAt },
     })
 
     if (claimed.count === 0) {
@@ -148,14 +151,17 @@ export async function POST(
         modelVersion = 'unknown'
       }
 
-      // 收尾守卫: 仅当仍持有分析权 (ANALYZING) 才写 FAILED 并回退 PENDING。
-      // 分析期间被卡死接管的人工兜底已 CONFIRMED 时,迟到的失败不覆盖任何状态
+      // 事务内先 CAS 收尾,再写审计;任一写入失败会整体回滚。
+      // 新分析接管后即使仍为 ANALYZING,旧批次也不能回退它的状态。
       const reverted = await prisma.$transaction(async (tx) => {
-        const cur = await tx.intake.findUnique({
-          where: { id },
-          select: { status: true },
+        const owned = await tx.intake.updateMany({
+          where: { id, status: 'ANALYZING', updatedAt: claimedAt },
+          data: {
+            status: 'PENDING',
+            updatedAt: new Date(Math.max(Date.now(), claimedAt.getTime() + 1)),
+          },
         })
-        if (!cur || cur.status !== 'ANALYZING') return false
+        if (owned.count === 0) return false
         await tx.intakeAnalysis.upsert({
           where: { intakeId: id },
           update: {
@@ -175,10 +181,6 @@ export async function POST(
             latencyMs,
             errorMessage,
           },
-        })
-        await tx.intake.update({
-          where: { id },
-          data: { status: 'PENDING' },
         })
         return true
       })
@@ -206,15 +208,16 @@ export async function POST(
     }
     const latencyMs = Date.now() - startedAt
 
-    // 收尾守卫: 成功结果同样只在仍持有分析权 (ANALYZING) 时落库。
-    // 分析期间被卡死接管的人工兜底已 CONFIRMED 时,迟到结果整体丢弃,
-    // 不写 Analysis/Issues、不改状态,避免同一 Intake 被再次确认
+    // 成功收尾也校验批次: 新分析或人工兜底接管后,迟到结果不能写入。
     const finalized = await prisma.$transaction(async (tx) => {
-      const cur = await tx.intake.findUnique({
-        where: { id },
-        select: { status: true },
+      const owned = await tx.intake.updateMany({
+        where: { id, status: 'ANALYZING', updatedAt: claimedAt },
+        data: {
+          status: 'ANALYZED',
+          updatedAt: new Date(Math.max(Date.now(), claimedAt.getTime() + 1)),
+        },
       })
-      if (!cur || cur.status !== 'ANALYZING') return null
+      if (owned.count === 0) return null
 
       // 创建/复用 Analysis (intakeId 唯一: 之前的 FAILED 行被复用为 COMPLETED)
       const analysis = await tx.intakeAnalysis.upsert({
@@ -254,12 +257,6 @@ export async function POST(
           evidenceConflict: issue.evidenceConflict || false,
           suggestedPriority: issue.suggestedPriority || null,
         })),
-      })
-
-      // 更新 Intake 状态 (此处必然从 ANALYZING 转移)
-      await tx.intake.update({
-        where: { id },
-        data: { status: 'ANALYZED' },
       })
 
       return analysis

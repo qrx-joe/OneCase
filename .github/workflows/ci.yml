@@ -35,6 +35,10 @@ jobs:
       - name: Unit tests
         run: pnpm -r test
 
+      # db:reset 只重置数据,首次运行必须先创建表。
+      - name: Prepare demo database
+        run: pnpm --filter @onecase/db db:push
+
       # 服务级业务不变量 (Confirm 完整性/兜底门禁/组织一致/analyze CAS):
       # 能构造 HTTP 与 Playwright 无法构造的状态,脚本自带 db:reset
       - name: Business invariant tests
@@ -45,9 +49,6 @@ jobs:
 
       - name: Install Playwright Chromium
         run: pnpm --filter @onecase/web exec playwright install --with-deps chromium
-
-      - name: Prepare demo database
-        run: pnpm --filter @onecase/db db:push
 
       - name: E2E (Playwright, webServer 自动拉起)
         run: pnpm --filter @onecase/web test:e2e

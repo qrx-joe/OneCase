@@ -2,7 +2,7 @@
 // 新建居民信息
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AppLayout } from '@/components/AppLayout'
 import { Button, Badge } from '@/components'
@@ -12,9 +12,52 @@ export default function NewIntakePage() {
   const [rawText, setRawText] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [restoring, setRestoring] = useState(true)
   // AI 失败前已创建的 Intake: 重试只重跑分析 (不重复建档),也可转手动创建
   const [createdIntakeId, setCreatedIntakeId] = useState<string | null>(null)
   const [createdRawText, setCreatedRawText] = useState('')
+
+  useEffect(() => {
+    let active = true
+    const id = new URLSearchParams(window.location.search).get('intakeId')
+    async function restoreIntake() {
+      try {
+        if (!id) return
+        const response = await fetch(`/api/intakes/${encodeURIComponent(id)}`, { cache: 'no-store' })
+        const { data } = await response.json()
+        if (!response.ok || data?.id !== id || typeof data.rawText !== 'string') {
+          throw new Error('无法恢复原始反馈,请稍后刷新重试。')
+        }
+        if (!active) return
+        if (data.status === 'CONFIRMED') {
+          router.replace('/cases')
+          return
+        }
+        if (data.status === 'ANALYZED') {
+          router.replace(`/intake/${id}/review`)
+          return
+        }
+        setCreatedIntakeId(id)
+        setCreatedRawText(data.rawText)
+        setRawText(data.rawText)
+        setError('已恢复原始反馈,可重试分析或改为手动创建 Case。')
+      } catch (e) {
+        if (active) setError(e instanceof Error ? e.message : '恢复失败,请刷新重试。')
+      } finally {
+        if (active) setRestoring(false)
+      }
+    }
+    void restoreIntake()
+    return () => { active = false }
+  }, [router])
+
+  // URL 只保留已落库的 ID;刷新时从服务端恢复原文,不在浏览器持久保存居民信息。
+  const rememberIntake = (id: string | null) => {
+    const url = new URL(window.location.href)
+    if (id) url.searchParams.set('intakeId', id)
+    else url.searchParams.delete('intakeId')
+    window.history.replaceState(null, '', url)
+  }
 
   const analyzeIntakeById = async (id: string) => {
     const analyzeRes = await fetch(`/api/intakes/${id}/analyze`, {
@@ -28,7 +71,7 @@ export default function NewIntakePage() {
   }
 
   const handleAnalyze = async () => {
-    if (!rawText.trim()) return
+    if (restoring || loading || !rawText.trim()) return
 
     setLoading(true)
     setError(null)
@@ -54,6 +97,7 @@ export default function NewIntakePage() {
         id = intakeData.data.id as string
         setCreatedIntakeId(id)
         setCreatedRawText(rawText)
+        rememberIntake(id)
       }
 
       await analyzeIntakeById(id)
@@ -83,6 +127,7 @@ export default function NewIntakePage() {
             className="field"
             placeholder="粘贴居民反馈..."
             value={rawText}
+            disabled={restoring || loading}
             onChange={(e) => setRawText(e.target.value)}
           />
           <span className="field-hint">
@@ -149,13 +194,19 @@ export default function NewIntakePage() {
 
       {/* 操作栏 */}
       <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'flex-end' }}>
-        <Button variant="secondary" onClick={() => setRawText('')}>
+        <Button variant="secondary" disabled={restoring || loading} onClick={() => {
+          setRawText('')
+          setCreatedIntakeId(null)
+          setCreatedRawText('')
+          setError(null)
+          rememberIntake(null)
+        }}>
           清空
         </Button>
         <Button
           variant="primary"
           onClick={handleAnalyze}
-          disabled={loading || !rawText.trim()}
+          disabled={restoring || loading || !rawText.trim()}
         >
           {loading ? 'AI 整理中...' : 'AI 整理为事项'}
         </Button>
