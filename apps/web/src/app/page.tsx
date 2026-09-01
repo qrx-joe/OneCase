@@ -249,7 +249,10 @@ export default function HomePage() {
                       aria-label={`${c.caseNumber} ${c.title}`}
                       onClick={() => (window.location.href = `/cases/${c.caseNumber}`)}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') window.location.href = `/cases/${c.caseNumber}`
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          window.location.href = `/cases/${c.caseNumber}`
+                        }
                       }}
                     >
                       <td data-label="优先级">
@@ -268,7 +271,7 @@ export default function HomePage() {
                       <td data-label="状态">
                         <Badge variant={badge.variant}>{badge.label}</Badge>
                       </td>
-                      <td>
+                      <td className="cell-actions">
                         <button
                           className="row-action"
                           onClick={(e) => {

@@ -49,7 +49,14 @@ test('一条消息 → 一条建案 + 一条"仅记录" → 处置留痕', async
   })
   expect(intake).not.toBeNull()
   const issues = await prisma.intakeIssue.findMany({
-    where: { analysisId: (await prisma.intakeAnalysis.findFirstOrThrow({ where: { intakeId: intake!.id } })).id },
+    where: {
+      analysisId: (
+        await prisma.intakeAnalysis.findFirstOrThrow({
+          where: { intakeId: intake!.id, status: 'COMPLETED' },
+          orderBy: { createdAt: 'desc' },
+        })
+      ).id,
+    },
     orderBy: { issueIndex: 'asc' },
   })
   expect(issues.map((i) => [i.action, i.disposition])).toEqual([

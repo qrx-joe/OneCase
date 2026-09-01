@@ -1731,6 +1731,11 @@ textarea.field {
     outline-offset: 2px;
   }
 
+  /* 整卡可点后"···"操作列冗余,移动端隐藏 (桌面保留) */
+  .case-table .cell-actions {
+    display: none;
+  }
+
   /* 草稿决策按钮触控尺寸与换行 */
   .draft-actions {
     flex-wrap: wrap;

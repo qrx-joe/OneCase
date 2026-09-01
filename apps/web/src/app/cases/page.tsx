@@ -213,7 +213,10 @@ function CasesView() {
                     aria-label={`${c.caseNumber} ${c.title}`}
                     onClick={() => (window.location.href = `/cases/${c.caseNumber}`)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') window.location.href = `/cases/${c.caseNumber}`
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        window.location.href = `/cases/${c.caseNumber}`
+                      }
                     }}
                   >
                     <td data-label="编号" style={{ fontFamily: 'monospace', fontSize: 10 }}>{c.caseNumber}</td>
