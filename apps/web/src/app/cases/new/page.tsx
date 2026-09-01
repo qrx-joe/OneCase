@@ -7,6 +7,7 @@ import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AppLayout } from '@/components/AppLayout'
 import { Button } from '@/components'
+import { IntakeSource } from '@/components/IntakeSource'
 
 const CATEGORY_OPTIONS = [
   { code: '', label: '未分类' },
@@ -84,6 +85,7 @@ function ManualCaseForm() {
         </div>
       )}
 
+      {sourceIntakeId && <IntakeSource intakeId={sourceIntakeId} />}
       <div className="detail-grid" style={{ gridTemplateColumns: '1fr' }}>
         <div className="detail-card">
           <div className="detail-section">

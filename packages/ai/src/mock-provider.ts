@@ -80,6 +80,9 @@ const MOCK_SCENARIOS: Record<string, ExtractionResult> = {
 
 export class MockProvider implements ExtractionProvider {
   async extractCaseDraft(input: ExtractionInput): Promise<ExtractionResult> {
+    if (input.attachments?.length) {
+      throw new Error('当前为 Mock 演示模式，不能识别图片。请配置支持视觉的 Qwen/OpenAI 模型，或改为手动创建事项。')
+    }
     // 模拟网络延迟 (300-800ms)
     await this.delay(300 + Math.random() * 500)
 

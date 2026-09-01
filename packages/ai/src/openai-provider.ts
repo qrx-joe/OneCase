@@ -18,6 +18,7 @@ export class OpenAIProvider implements ExtractionProvider {
       apiKey: this.apiKey,
       model: this.model,
       rawText: input.rawText,
+      attachments: input.attachments,
       timeoutMs: this.options.timeoutMs ?? 30000,
       maxRetries: this.options.maxRetries ?? 1,
     })

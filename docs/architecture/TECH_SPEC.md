@@ -4,6 +4,14 @@
 架构原则：Modular Monolith First
 目标：72 小时能交付 Mock-first MVP，后续接真实 Provider 时不推翻 Domain 边界。
 
+## 当前实现补充（2026-08-31）
+
+本文其余部分保留设计基线，不代表全部落地。当前使用 SQLite，图片分析仍为同步请求；尚未实现下文规划的 PostgreSQL 队列、signed URL 或生产权限。
+
+图片从 Intake 页面以 multipart 提交到现有创建接口，服务端检查实际请求大小、MIME 和文件头，在一个事务中写入 Intake 与 Attachment。图片以 data URL 存入 Attachment，不写公开目录。分析接口读取附件，通过 Provider 的 `image_url` 消息提交；模型输出沿用 Zod 校验、失败记录和人工确认。GET 详情支持恢复图片，确认页和手动创建页显示原图。
+
+本次没有迁移数据库或增加依赖，未改查重、正式事项确认及状态机规则。Mock 拒绝图片，不模拟成功；真实模型未实测。完整字段与验证记录见 [图片输入说明](../testing/image-intake.md)。
+
 ## 1. 决策原则
 
 优先级：Correctness > Privacy/Security > Maintainability > Observability > Extensibility > Performance > Novelty。

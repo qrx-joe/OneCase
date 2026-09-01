@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { AppLayout } from '@/components/AppLayout'
 import { Button, Badge } from '@/components'
+import { IntakeSource } from '@/components/IntakeSource'
 
 interface Issue {
   id: string
@@ -341,6 +342,7 @@ export default function IntakeReviewPage() {
         </div>
       </div>
 
+      <IntakeSource intakeId={intakeId} />
       <div className="review-layout">
         {/* 左侧: Draft 卡片 + 每个的决策 */}
         <div style={{ display: 'grid', gap: 12 }}>

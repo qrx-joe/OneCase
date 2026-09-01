@@ -127,7 +127,10 @@ export async function POST(
     let provider = 'mock'
     let modelVersion = 'unknown'
     try {
-      result = await analyzeIntake(intake.rawText || '')
+      const attachments = await prisma.attachment.findMany({
+        where: { intakeId: id }, select: { type: true, url: true },
+      })
+      result = await analyzeIntake(intake.rawText || '', attachments)
       // 实际生效的 provider (Demo 降级时如实记录为 mock)
       ;({ provider, modelVersion } = getProviderInfo())
     } catch (aiError) {

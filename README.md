@@ -1,14 +1,14 @@
 # OneCase - 社区事项 AI 工作台
 
 **版本**: v0.1 MVP
-**状态**: 黄金链路已闭环 (可演示)
-**更新**: 2026-08-28
+**状态**: 文字流程可演示；图片上传已接通，真实识别待配置视觉模型并验收
+**更新**: 2026-08-31
 
 ---
 
 ## 项目简介
 
-OneCase 是面向社区工作人员的 AI Intake & Case Management Layer。
+OneCase 帮社区工作人员把居民反馈整理成可编辑的草稿，由人决定新建事项或关联已有事项，再跟进来源、状态和处理记录。
 
 **核心判断**:
 ```
@@ -16,7 +16,7 @@ Message != Case
 AI Draft != Business Fact
 ```
 
-**黄金链路** (已全部实现并验证):
+**文字演示流程**（Mock 用于验证流程，不代表真实模型效果）：
 ```
 居民反馈 → AI 结构化提取 (1..N 草稿)
 → Duplicate 候选 (含 Hard Negative 保护,Top3+匹配依据)
@@ -27,6 +27,22 @@ AI Draft != Business Fact
 ```
 
 ---
+
+## 当前功能范围
+
+| 功能 | 当前情况 |
+|---|---|
+| 文字整理、草稿编辑、人工确认与事项跟踪 | 已实现，保留原有文字流程 |
+| 截图／图片输入 | 可选择、拖拽或粘贴；每次 1 张 JPG、PNG 或 WebP，最大 10 MB；支持预览、移除及补充说明 |
+| 图片保存与失败恢复 | 点击整理后上传；与原始反馈一同保存，刷新可恢复，重试复用记录；人工确认时可查看原图 |
+| 真实图片识别 | 已接通 Qwen/OpenAI 图片消息；需配置支持视觉的模型，尚未完成真实模型验收 |
+| Mock 图片处理 | 明确返回不能识别，不用固定结果冒充图片识别 |
+| 语音 | 暂未支持，入口已禁用；可自行转写后粘贴文字 |
+| 微信接入、Embedding 查重 | 尚未实现 |
+
+2026-08-31 本地检查的运行模式为 `mock / mock-v1`。当前状态可在 `/api/intakes/capabilities` 查看；该接口只检查本地配置，不调用模型。
+
+项目尚未公开发布，仅使用合成数据演示。图片存入本地数据库，分析时发送给配置的模型服务；目前没有生产级认证、访问控制或数据留存机制，请勿录入真实居民隐私。
 
 ## 快速开始
 
@@ -52,7 +68,7 @@ pnpm --filter @onecase/web dev
 
 ### 演示前重置
 
-演示或测试污染数据后一键恢复:
+仅在确认数据可丢弃的独立演示库中使用；此命令会清空业务数据，不能作为日常启动步骤：
 
 ```bash
 pnpm --filter @onecase/db db:reset    # 清空业务表 + 重新 seed
@@ -61,6 +77,8 @@ pnpm --filter @onecase/db db:reset    # 清空业务表 + 重新 seed
 ---
 
 ## 演示流程 (90 秒)
+
+下面是文字 Mock 演示的 seed 示例，候选、分数及统计以当前页面为准。图片演示步骤见 [演示脚本](docs/demo/DEMO_SCRIPT.md)；未配置视觉模型时只展示上传、保存和转人工，不展示“识别成功”。
 
 | 步骤 | 操作 | 预期 |
 |------|------|------|
@@ -84,8 +102,10 @@ pnpm --filter @onecase/db db:reset    # 清空业务表 + 重新 seed
 ## 测试
 
 ```bash
-pnpm --filter @onecase/domain test   # Domain 33/33 (状态机/优先级/评分)
-pnpm --filter @onecase/ai test       # AI 47/47 (Mock/Qwen/OpenAI/Contract/超时/重试/Eval 20 条)
+pnpm --filter @onecase/domain test   # 业务规则；本次图片修复未重跑此包
+pnpm --filter @onecase/ai test       # Provider、图片传参、Contract、超时与重试
+pnpm --filter @onecase/web test      # 图片输入边界、Provider 装配及查重服务
+pnpm --filter @onecase/web typecheck
 
 # 端到端 (需 Dev Server 运行在 3000,脚本需先 db:reset)
 node apps/web/scripts/test-golden-path.mjs    # 黄金链路 (创建→分析→确认,一关联一新建+幂等)
@@ -97,6 +117,8 @@ pnpm --filter @onecase/web test:e2e           # 黄金链路 + 草稿编辑
 
 pnpm --filter @onecase/web build     # 构建验证
 ```
+
+2026-08-31 图片修复后通过：AI 包 52 项、Web 包 24 项单元测试，共 76 项；Web 类型检查与 AI 包编译通过。另验证了本地图片上传、完整恢复、幂等重试、换图冲突和 Mock 失败处理，浏览器检查了选择／预览、刷新恢复及原图核对。本轮未重跑全仓构建、业务不变量套件或完整 E2E，也未调用真实模型。详见 [图片输入验证记录](docs/testing/image-intake.md)。
 
 **CI**: GitHub Actions (`.github/workflows/ci.yml`) 在每次 push/PR 上自动跑 typecheck、单测（含 20 条合成 Eval）、全仓 build 与 Playwright E2E。
 
@@ -128,7 +150,18 @@ docs/
 
 ## AI Provider
 
-`AI_PROVIDER=mock` (默认,断网可用)。Qwen/OpenAI 已实现 (packages/ai),接入时设 `QWEN_API_KEY` 并改工厂配置 — 业务层只依赖 `ExtractionProvider` 接口,切换无侵入。
+默认 `AI_PROVIDER=mock`，文字流程可离线演示，但 Mock 不能识别图片。
+
+启用真实模型时，在启动 Web 服务的环境中设置以下变量，不需要改工厂代码：
+
+| Provider | 必要配置 |
+|---|---|
+| Qwen | `AI_PROVIDER=qwen`、`QWEN_API_KEY`，并用 `QWEN_MODEL` 指定支持视觉的模型 |
+| OpenAI | `AI_PROVIDER=openai`、`OPENAI_API_KEY`，并用 `OPENAI_MODEL` 指定支持视觉的模型 |
+
+本地可将配置放在不入库的 `apps/web/.env.local`，修改后重启服务。不要把密钥写进代码、邮件或参赛附件。仅当 `DEMO_MODE=true` 与 `AI_ALLOW_MOCK_FALLBACK=true` 同时启用时，配置失败才允许退回 Mock；退回后仍不能识别图片。
+
+图片以 `image_url` 消息发送，结构化结果经校验后进入原有人工确认流程。接口和模拟响应测试通过不代表真实识别质量已验证。文件格式、存储方式和接口字段见 [图片输入说明](docs/testing/image-intake.md)。
 
 ## 关键约束 (实现于代码中)
 
@@ -146,5 +179,11 @@ docs/
 - 认证/RBAC/租户硬隔离未实现 (organizationId 仅过滤,未校验归属)
 - Case 编号 `count()+1` 并发可重号 → 改序列
 - Embedding 重复检测未接 (当前为标题/地点/类别启发式)
+- 图片识别需真实视觉模型验收；语音录音和转写尚未接入
+- 图片目前以 data URL 存入 SQLite，仅适合小规模演示；生产存储与权限仍需设计
 - SQLite → PostgreSQL 迁移
 - webpack 缓存损坏: 改 lib 文件后热重载可能 500,重启 `pnpm dev` 即恢复;`next build` 与运行中的 dev server 共写 `.next`,build 后建议重启 dev
+
+## 参赛材料
+
+当前使用 AI+民生个人参赛版 v2，不使用团队名称。材料入口见 [初赛提交说明](docs/competition/preliminary-2026/README.md)。v2 PPT 正文、14 页备注及配套 PDF 已同步图片修复后的说明，并核对文字与排版；与项目简介 Word 一起放在 [初赛提交附件-v2](docs/competition/preliminary-2026/初赛提交附件-v2/)。姓名和电话留在报名资料及邮件中，不放入展示材料。邮件尚未发送，报名与资格仍需本人核实。

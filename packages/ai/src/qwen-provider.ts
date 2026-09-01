@@ -1,6 +1,6 @@
 // Qwen AI Provider (通义千问, DashScope OpenAI 兼容模式)
 // API 文档: https://help.aliyun.com/zh/dashscope/developer-reference/compatibility-of-openai-with-dashscope
-// 超时/重试/Schema 校验见 openai-compatible.ts;当前仅文本输入 (多模态附件为后续工作)
+// 超时/重试/Schema 校验及图片消息封装见 openai-compatible.ts
 import { ExtractionProvider, ExtractionInput, ExtractionResult } from './provider'
 import { extractViaOpenAICompatible } from './openai-compatible'
 
@@ -19,6 +19,7 @@ export class QwenProvider implements ExtractionProvider {
       apiKey: this.apiKey,
       model: this.model,
       rawText: input.rawText,
+      attachments: input.attachments,
       timeoutMs: this.options.timeoutMs ?? 30000,
       maxRetries: this.options.maxRetries ?? 1,
     })

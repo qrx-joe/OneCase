@@ -4,7 +4,7 @@
 // Mock (DEMO_MODE=true 且 AI_ALLOW_MOCK_FALLBACK=true);其他环境必须抛错,
 // 让 analyze 写入 FAILED Analysis 并允许重试/手动兜底,不得把配置错误伪装成分析成功。
 // 审计: getProviderInfo 返回实际生效的 provider/model,降级时如实记录为 mock
-import { createProvider, MockProvider, type ExtractionProvider } from '@onecase/ai'
+import { createProvider, MockProvider, type ExtractionProvider, type ExtractionInput } from '@onecase/ai'
 
 export type ProviderType = 'mock' | 'qwen' | 'openai'
 
@@ -103,6 +103,6 @@ export function getProviderInfo(): { provider: ProviderType; modelVersion: strin
   return { provider: actual, modelVersion }
 }
 
-export async function analyzeIntake(rawText: string) {
-  return getExtractionProvider().extractCaseDraft({ rawText })
+export async function analyzeIntake(rawText: string, attachments?: ExtractionInput['attachments']) {
+  return getExtractionProvider().extractCaseDraft({ rawText, attachments })
 }

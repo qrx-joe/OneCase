@@ -719,6 +719,16 @@ a {
   color: var(--text);
 }
 
+.intake-tab:disabled { cursor: not-allowed; opacity: 0.5; }
+.image-dropzone { display: block; width: 100%; font: inherit; }
+.image-dropzone:focus-visible { outline: 2px solid var(--oc-blue, #007aff); outline-offset: 3px; }
+.image-dropzone:disabled { cursor: wait; opacity: 0.6; }
+.intake-image-preview { margin-top: 12px; padding: 12px; border: 1px solid var(--border-strong); border-radius: 12px; }
+.intake-image-preview img { display: block; max-width: 100%; max-height: 360px; object-fit: contain; margin: 0 auto; }
+.intake-image-preview > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+.intake-image-preview span { overflow-wrap: anywhere; font-size: 12px; }
+.image-input-error { color: #C92F27; font-size: 12px; margin-top: 8px; }
+
 .intake-tab.active {
   background: #fff;
   box-shadow: var(--shadow-xs);

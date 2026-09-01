@@ -21,7 +21,12 @@ export async function GET(
       )
     }
 
-    return NextResponse.json({ data: intake })
+    const attachments = await prisma.attachment.findMany({
+      where: { intakeId: id }, select: { id: true, type: true, url: true, size: true, mimeType: true },
+    })
+    return NextResponse.json({ data: { ...intake, attachments } }, {
+      headers: { 'Cache-Control': 'no-store' },
+    })
   } catch (error) {
     console.error('Get intake failed:', error)
     return NextResponse.json(
