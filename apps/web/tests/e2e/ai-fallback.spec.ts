@@ -38,7 +38,8 @@ for (const { recovery, refresh } of [
     await page.goto('/intake')
     await page.getByLabel('居民原始信息').fill(RAW_TEXT)
     await page.getByRole('button', { name: 'AI 整理为事项' }).click()
-    await expect(page.getByText(/原始反馈已保存,不会丢失/)).toBeVisible()
+    // 基线(图片输入改造)后错误横幅为 "AI 分析失败 (…) （原始反馈已保存）"
+    await expect(page.getByText(/原始反馈已保存/).first()).toBeVisible()
     if (refresh) {
       await page.reload()
       await expect(page.getByLabel('居民原始信息')).toHaveValue(RAW_TEXT)
@@ -48,7 +49,7 @@ for (const { recovery, refresh } of [
     await page.getByRole('button', { name: '重试', exact: true }).click()
 
     if (recovery === 'manual') {
-      await expect(page.getByText(/原始反馈已保存,不会丢失/)).toBeVisible()
+      await expect(page.getByText(/原始反馈已保存/).first()).toBeVisible()
     } else {
       await page.waitForURL(/\/intake\/.+\/review/)
       await expect(page.getByText('AI 草稿 · 未写入事项').first()).toBeVisible()
