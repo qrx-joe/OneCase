@@ -8,6 +8,7 @@ import { AppLayout } from '@/components/AppLayout'
 import { Button, Badge } from '@/components'
 import { IntakeSource } from '@/components/IntakeSource'
 import { ISSUE_DISPOSITIONS, DISPOSITION_LABELS, type IssueDisposition } from '@onecase/contracts'
+import { prefillCreateForEmptyCandidates } from '@/lib/review-defaults'
 
 interface Issue {
   id: string
@@ -114,6 +115,8 @@ export default function IntakeReviewPage() {
                 editsRef.current[idx]?.locationText !== undefined
             )
           setCandidates(allCandidates.map((list, idx) => (editedIdx.includes(idx) ? [] : list)))
+          // S1-T6: 初始候选为空的 Issue 预填"新建事项";已编辑(候选过期)与有候选的不预填
+          setDecisions((prev) => prefillCreateForEmptyCandidates(prev, allCandidates, { skip: editedIdx }))
           // 记录本次候选使用的草稿值,后续编辑据此判断是否过期
           issuesInput.forEach((issue: Issue, idx: number) => {
             lastQueryRef.current[idx] = {
@@ -205,6 +208,12 @@ export default function IntakeReviewPage() {
             next[idx] = list
             return next
           })
+          // S1-T6: 重查确认无候选且用户未决策 → 预填"新建事项"(检索失败不预填)
+          if (ok && list.length === 0) {
+            const single: unknown[][] = []
+            single[idx] = list
+            setDecisions((prev) => prefillCreateForEmptyCandidates(prev, single))
+          }
           setDupErrors((prev) => ({ ...prev, [idx]: !ok }))
           setStaleCandidates((prev) => (prev[idx] ? { ...prev, [idx]: false } : prev))
           lastQueryRef.current[idx] = { title, location }
@@ -456,7 +465,13 @@ export default function IntakeReviewPage() {
                   <span style={{ fontSize: 10, color: 'var(--text-3)' }}>
                     {decision
                       ? decision.decision === 'CREATE_CASE'
-                        ? '✓ 将新建事项'
+                        ? `✓ 将新建事项${
+                            (candidates[idx] ?? []).length === 0 &&
+                            !staleCandidates[idx] &&
+                            dupErrors[idx] !== true
+                              ? '（无相似候选，已选新建）'
+                              : ''
+                          }`
                         : decision.decision === 'LINK_EXISTING'
                         ? (() => {
                             const linked = (candidates[idx] || []).find(
