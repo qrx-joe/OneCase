@@ -243,8 +243,16 @@ export default function HomePage() {
                 {filteredCases.map((c) => {
                   const badge = STATUS_BADGES[c.status] || { label: c.status, variant: 'gray' as const }
                   return (
-                    <tr key={c.id} onClick={() => (window.location.href = `/cases/${c.caseNumber}`)}>
-                      <td>
+                    <tr
+                      key={c.id}
+                      tabIndex={0}
+                      aria-label={`${c.caseNumber} ${c.title}`}
+                      onClick={() => (window.location.href = `/cases/${c.caseNumber}`)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') window.location.href = `/cases/${c.caseNumber}`
+                      }}
+                    >
+                      <td data-label="优先级">
                         <span className={`priority ${c.priority.toLowerCase()}`}>{c.priority}</span>
                       </td>
                       <td>
@@ -254,10 +262,10 @@ export default function HomePage() {
                           {c.locationText ? ` · ${c.locationText}` : ''}
                         </div>
                       </td>
-                      <td>
+                      <td data-label="类别">
                         {c.categoryCode ? CATEGORY_LABELS[c.categoryCode] || c.categoryCode : '-'}
                       </td>
-                      <td>
+                      <td data-label="状态">
                         <Badge variant={badge.variant}>{badge.label}</Badge>
                       </td>
                       <td>

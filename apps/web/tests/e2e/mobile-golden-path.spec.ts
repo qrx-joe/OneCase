@@ -62,13 +62,24 @@ test('移动端: 底部导航 → 居民来件 → 一关联一新建 → 详情
   await page.waitForURL((url) => url.pathname === '/')
   expect(confirmDialog).toContain('关联 1 个: CASE-018')
 
-  // 4. 事项列表: 表格已降级为卡片 (无表头,行呈块状)
+  // 4. 事项列表: 表格已降级为卡片 (无表头,行呈块状),字段标签由 data-label 补充语义
   await page.goto('/cases')
   await expectNoHorizontalOverflow(page)
   await expect(page.locator('.case-table thead')).toBeHidden()
   const card = page.locator('.case-table tbody tr', { hasText: 'CASE-018' })
   await expect(card).toBeVisible()
-  await card.click()
+
+  // 字段标签可见: 不依赖列顺序即可理解字段含义 (审查报告 P2)
+  for (const field of ['类别', '地点', '优先级', '状态']) {
+    const label = await card
+      .locator(`td[data-label="${field}"]`)
+      .evaluate((el) => getComputedStyle(el, '::before').content)
+    expect(label).toContain(field)
+  }
+
+  // 键盘可达: 聚焦卡片后 Enter 进入详情 (与点击行为一致)
+  await card.focus()
+  await page.keyboard.press('Enter')
   await page.waitForURL(/\/cases\/CASE-\d+/)
 
   // 5. 详情页: 状态下拉改"已解决",Badge 与 Timeline 更新

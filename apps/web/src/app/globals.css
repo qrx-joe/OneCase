@@ -1717,6 +1717,20 @@ textarea.field {
     text-align: left;
   }
 
+  /* 卡片字段标签: 桌面由表头承担,移动端表头隐藏后由 data-label 补充语义 */
+  .case-table td[data-label]::before {
+    content: attr(data-label) "：";
+    font-size: 9px;
+    color: var(--text-3);
+    margin-right: 6px;
+  }
+
+  /* 行卡片可聚焦 (键盘 Enter 进入详情,与点击行为一致) */
+  .case-table tbody tr:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
   /* 草稿决策按钮触控尺寸与换行 */
   .draft-actions {
     flex-wrap: wrap;

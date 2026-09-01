@@ -209,23 +209,28 @@ function CasesView() {
                 return (
                   <tr
                     key={c.id}
+                    tabIndex={0}
+                    aria-label={`${c.caseNumber} ${c.title}`}
                     onClick={() => (window.location.href = `/cases/${c.caseNumber}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') window.location.href = `/cases/${c.caseNumber}`
+                    }}
                   >
-                    <td style={{ fontFamily: 'monospace', fontSize: 10 }}>{c.caseNumber}</td>
+                    <td data-label="编号" style={{ fontFamily: 'monospace', fontSize: 10 }}>{c.caseNumber}</td>
                     <td>
                       <div className="case-title">{c.title}</div>
                       <div className="case-sub">
                         {new Date(c.createdAt).toLocaleDateString('zh-CN')}
                       </div>
                     </td>
-                    <td>
+                    <td data-label="类别">
                       {c.categoryCode ? CATEGORY_LABELS[c.categoryCode] || c.categoryCode : '-'}
                     </td>
-                    <td>{c.locationText || '-'}</td>
-                    <td>
+                    <td data-label="地点">{c.locationText || '-'}</td>
+                    <td data-label="优先级">
                       <span className={`priority ${c.priority.toLowerCase()}`}>{c.priority}</span>
                     </td>
-                    <td>
+                    <td data-label="状态">
                       <Badge variant={badge.variant}>{badge.label}</Badge>
                     </td>
                   </tr>
