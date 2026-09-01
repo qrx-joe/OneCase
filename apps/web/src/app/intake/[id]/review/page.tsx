@@ -7,6 +7,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { AppLayout } from '@/components/AppLayout'
 import { Button, Badge } from '@/components'
 import { IntakeSource } from '@/components/IntakeSource'
+import { ISSUE_DISPOSITIONS, DISPOSITION_LABELS, type IssueDisposition } from '@onecase/contracts'
 
 interface Issue {
   id: string
@@ -46,8 +47,11 @@ export default function IntakeReviewPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // 每个 issue 的决策: CREATE_CASE / LINK_EXISTING(带 targetCaseId) / REJECTED
-  const [decisions, setDecisions] = useState<Record<number, { decision: Decision; targetCaseId?: string }>>({})
+  // 每个 issue 的决策: CREATE_CASE / LINK_EXISTING(带 targetCaseId) / REJECTED(带业务出口 disposition)
+  const [decisions, setDecisions] = useState<Record<number, { decision: Decision; targetCaseId?: string; disposition?: IssueDisposition; dispositionNote?: string }>>({})
+  // "不建事项"选择面板的展开状态与"暂不受理"原因草稿
+  const [rejectOpen, setRejectOpen] = useState<Record<number, boolean>>({})
+  const [rejectNotes, setRejectNotes] = useState<Record<number, string>>({})
   // 人工编辑的草稿字段 (只记录改动过的字段,未改动的沿用 AI 原值)
   const [edits, setEdits] = useState<Record<number, { title?: string; locationText?: string; suggestedPriority?: string }>>({})
   // Duplicate 候选一致性: 编辑标题/地点后旧候选过期 (P2),重查成功前不得作为当前结果
@@ -216,7 +220,22 @@ export default function IntakeReviewPage() {
       ...prev,
       [index]: { decision, targetCaseId },
     }))
+    setRejectOpen((prev) => ({ ...prev, [index]: false }))
   }, [])
+
+  // 不建事项: 必须选择业务出口;暂不受理(DEFERRED)必须填写原因
+  const setDisposition = useCallback(
+    (index: number, disposition: IssueDisposition) => {
+      const note = disposition === 'DEFERRED' ? rejectNotes[index]?.trim() : undefined
+      if (disposition === 'DEFERRED' && !note) return
+      setDecisions((prev) => ({
+        ...prev,
+        [index]: { decision: 'REJECTED', disposition, dispositionNote: note },
+      }))
+      setRejectOpen((prev) => ({ ...prev, [index]: false }))
+    },
+    [rejectNotes]
+  )
 
   const setEdit = useCallback(
     (index: number, field: 'title' | 'locationText' | 'suggestedPriority', value: string) => {
@@ -243,6 +262,8 @@ export default function IntakeReviewPage() {
         issueIndex: idx,
         decision: decisions[idx].decision,
         targetCaseId: decisions[idx].targetCaseId,
+        disposition: decisions[idx].disposition,
+        dispositionNote: decisions[idx].dispositionNote,
         // 携带人工编辑 (仅改动过的字段);创建新 Case 时以人工值为准
         ...(edits[idx] ? { edit: edits[idx] } : {}),
       }))
@@ -259,13 +280,19 @@ export default function IntakeReviewPage() {
       const data = await res.json()
 
       if (res.ok && data.data?.success) {
-        const { createdCases, linkedCases } = data.data
+        const { createdCases, linkedCases, disposedIssues } = data.data
         const parts = []
         if (createdCases.length > 0) {
           parts.push(`创建 ${createdCases.length} 个: ${createdCases.map((c: any) => c.caseNumber).join(', ')}`)
         }
         if (linkedCases.length > 0) {
           parts.push(`关联 ${linkedCases.length} 个: ${linkedCases.map((c: any) => c.caseNumber).join(', ')}`)
+        }
+        if (disposedIssues?.length > 0) {
+          const labels = disposedIssues
+            .map((d: { disposition: IssueDisposition }) => DISPOSITION_LABELS[d.disposition] || d.disposition)
+            .join('、')
+          parts.push(`不建事项 ${disposedIssues.length} 个: ${labels}`)
         }
         alert(`✅ 确认成功!\n${parts.join('\n')}`)
         router.push('/')
@@ -437,16 +464,18 @@ export default function IntakeReviewPage() {
                             )
                             return linked ? `✓ 将关联 ${linked.caseNumber}` : '✓ 将关联已有事项'
                           })()
-                        : '已跳过'
+                        : `✓ 不建事项：${DISPOSITION_LABELS[decision.disposition as IssueDisposition] || decision.disposition}` +
+                          (decision.dispositionNote ? `（${decision.dispositionNote}）` : '')
                       : '请选择操作'}
                   </span>
                   <div style={{ display: 'flex', gap: 7 }}>
                     <Button
-                      variant="secondary"
+                      variant={decision?.decision === 'REJECTED' ? 'secondary' : 'ghost'}
                       size="sm"
-                      onClick={() => setDecision(idx, 'REJECTED')}
+                      aria-expanded={rejectOpen[idx] ?? false}
+                      onClick={() => setRejectOpen((prev) => ({ ...prev, [idx]: !prev[idx] }))}
                     >
-                      跳过
+                      不建事项
                     </Button>
                     <Button
                       variant={decision?.decision === 'CREATE_CASE' ? 'primary' : 'outline'}
@@ -457,6 +486,67 @@ export default function IntakeReviewPage() {
                     </Button>
                   </div>
                 </div>
+
+                {/* 不建事项: 必须选择业务出口 (S1-T5),暂不受理须填原因 */}
+                {rejectOpen[idx] && (
+                  <div
+                    style={{
+                      marginTop: 10,
+                      padding: '10px 12px',
+                      border: '1px dashed var(--border)',
+                      borderRadius: 11,
+                      background: '#FCFCFD',
+                    }}
+                  >
+                    <p style={{ fontSize: 10, color: 'var(--text-3)', margin: '0 0 8px' }}>
+                      选择不建事项的原因（必选，会留痕）：
+                    </p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {ISSUE_DISPOSITIONS.filter((d) => d !== 'DEFERRED').map((d) => (
+                        <button
+                          key={d}
+                          type="button"
+                          className={`chip ${decision?.disposition === d ? 'active' : ''}`}
+                          onClick={() => setDisposition(idx, d)}
+                        >
+                          {DISPOSITION_LABELS[d]}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        className={`chip ${decision?.disposition === 'DEFERRED' ? 'active' : ''}`}
+                        onClick={() =>
+                          setRejectNotes((prev) => ({ ...prev, [idx]: prev[idx] ?? '' }))
+                        }
+                      >
+                        暂不受理
+                      </button>
+                    </div>
+                    {rejectNotes[idx] !== undefined && (
+                      <div style={{ marginTop: 8, display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <input
+                          className="field"
+                          style={{ flex: 1 }}
+                          placeholder="暂不受理的原因（必填，最多 200 字）"
+                          maxLength={200}
+                          aria-label="暂不受理原因"
+                          value={rejectNotes[idx] || ''}
+                          onChange={(e) =>
+                            setRejectNotes((prev) => ({ ...prev, [idx]: e.target.value }))
+                          }
+                        />
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          disabled={!rejectNotes[idx]?.trim()}
+                          onClick={() => setDisposition(idx, 'DEFERRED')}
+                        >
+                          确认暂不受理
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )
           })}

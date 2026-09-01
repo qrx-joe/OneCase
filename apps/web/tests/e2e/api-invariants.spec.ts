@@ -51,7 +51,7 @@ test('重复 issueIndex → 422', async ({ request }) => {
       analysisId,
       issueDecisions: [
         { issueIndex: 0, decision: 'CREATE_CASE' },
-        { issueIndex: 0, decision: 'REJECTED' },
+        { issueIndex: 0, decision: 'REJECTED', disposition: 'NOTE_ONLY' },
       ],
       userId: 'e2e',
     },
@@ -105,8 +105,8 @@ test('已 CONFIRMED Intake 不能再分析 → 409 (防 CONFIRMED 被覆盖回 A
     data: {
       analysisId,
       issueDecisions: [
-        { issueIndex: 0, decision: 'REJECTED' },
-        { issueIndex: 1, decision: 'REJECTED' },
+        { issueIndex: 0, decision: 'REJECTED', disposition: 'NOTE_ONLY' },
+        { issueIndex: 1, decision: 'REJECTED', disposition: 'INVALID' },
       ],
       userId: 'e2e',
     },

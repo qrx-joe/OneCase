@@ -123,6 +123,9 @@ model IntakeIssue {
   suggestedPriority String?
   action          String?
   confirmedCaseId String?
+  // 不建事项的业务出口 (S1-T5): ANSWERED | NOTE_ONLY | INVALID | DEFERRED,仅 REJECTED 决策填写
+  disposition     String?
+  dispositionNote String?
 
   @@unique([analysisId, issueIndex])
   @@index([analysisId])

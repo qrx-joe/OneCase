@@ -386,18 +386,18 @@ async function main() {
     intakeId: b.intakeId,
     analysisId: b.analysisId,
     issueDecisions: [
-      { issueIndex: 0, decision: 'REJECTED' },
-      { issueIndex: 1, decision: 'REJECTED' },
+      { issueIndex: 0, decision: 'REJECTED', disposition: 'NOTE_ONLY' },
+      { issueIndex: 1, decision: 'REJECTED', disposition: 'INVALID' },
     ],
   })
-  check('全部显式 REJECTED 成功', rejected.success && rejected.createdCases.length === 0 && rejected.linkedCases.length === 0, JSON.stringify(rejected.errors))
+  check('全部显式 REJECTED 成功', rejected.success && rejected.createdCases.length === 0 && rejected.linkedCases.length === 0 && rejected.disposedIssues.length === 2, JSON.stringify(rejected.errors))
   check('全拒绝不产生 Case', (await prisma.case.count()) === casesBeforeB)
   // 决策留痕: 每个 Issue 的 action 都被显式写入,不靠推断
   const bIssues = await prisma.intakeIssue.findMany({ where: { analysisId: b.analysisId } })
   check(
-    'REJECTED 决策留痕 (IntakeIssue.action)',
-    bIssues.length === 2 && bIssues.every((i) => i.action === 'REJECTED'),
-    JSON.stringify(bIssues.map((i) => [i.issueIndex, i.action]))
+    'REJECTED 决策留痕 (IntakeIssue.action + disposition)',
+    bIssues.length === 2 && bIssues.every((i) => i.action === 'REJECTED' && i.disposition),
+    JSON.stringify(bIssues.map((i) => [i.issueIndex, i.action, i.disposition]))
   )
   const aIssues = await prisma.intakeIssue.findMany({ where: { analysisId: a.analysisId } })
   const linkedIssue = aIssues.find((i) => i.issueIndex === 0)!
@@ -407,6 +407,47 @@ async function main() {
     linkedIssue.action === 'LINK_EXISTING' && linkedIssue.confirmedCaseId === ok.linkedCases[0].caseId &&
     createdIssue.action === 'CREATE_CASE' && createdIssue.confirmedCaseId === ok.createdCases[0].id,
     JSON.stringify(aIssues.map((i) => [i.issueIndex, i.action, i.confirmedCaseId]))
+  )
+
+  // ============================================================
+  // §3-4 不建事项必须携带业务出口 (S1-T5)
+  // ============================================================
+  console.log('\n── §3-4 不建事项必须带业务出口 ──')
+  const disp = await createAnalyzedIntake('五栋电梯最近总是有怪声,有时候还会停在楼层中间不动,挺吓人的。')
+  const noDisp = await confirmIntake({
+    intakeId: disp.intakeId, analysisId: disp.analysisId,
+    issueDecisions: [{ issueIndex: 0, decision: 'REJECTED' }],
+  })
+  check('REJECTED 缺业务出口被拒 (DISPOSITION_REQUIRED)', !noDisp.success && noDisp.errors.includes('DISPOSITION_REQUIRED'), JSON.stringify(noDisp.errors))
+
+  const badDisp = await confirmIntake({
+    intakeId: disp.intakeId, analysisId: disp.analysisId,
+    issueDecisions: [{ issueIndex: 0, decision: 'REJECTED', disposition: 'WHATEVER' } as never],
+  })
+  check('非法业务出口值被拒', !badDisp.success && badDisp.errors.includes('DISPOSITION_REQUIRED'), JSON.stringify(badDisp.errors))
+
+  const deferredNoNote = await confirmIntake({
+    intakeId: disp.intakeId, analysisId: disp.analysisId,
+    issueDecisions: [{ issueIndex: 0, decision: 'REJECTED', disposition: 'DEFERRED' }],
+  })
+  check('暂不受理缺原因被拒 (DEFERRED_NOTE_REQUIRED)', !deferredNoNote.success && deferredNoNote.errors.includes('DEFERRED_NOTE_REQUIRED'), JSON.stringify(deferredNoNote.errors))
+
+  const createWithDisp = await confirmIntake({
+    intakeId: disp.intakeId, analysisId: disp.analysisId,
+    issueDecisions: [{ issueIndex: 0, decision: 'CREATE_CASE', disposition: 'NOTE_ONLY' } as never],
+  })
+  check('建案决策携带业务出口视为歧义被拒', !createWithDisp.success && createWithDisp.errors.includes('INVALID_ISSUE_DECISION'), JSON.stringify(createWithDisp.errors))
+
+  const deferredOk = await confirmIntake({
+    intakeId: disp.intakeId, analysisId: disp.analysisId,
+    issueDecisions: [{ issueIndex: 0, decision: 'REJECTED', disposition: 'DEFERRED', dispositionNote: '已现场答复，观察一周' }],
+  })
+  check('带原因的暂不受理成功并留痕', deferredOk.success && deferredOk.disposedIssues.length === 1, JSON.stringify(deferredOk.errors))
+  const dispIssue = (await prisma.intakeIssue.findMany({ where: { analysisId: disp.analysisId } }))[0]
+  check(
+    '处置与原因写入 IntakeIssue',
+    dispIssue.action === 'REJECTED' && dispIssue.disposition === 'DEFERRED' && dispIssue.dispositionNote === '已现场答复，观察一周',
+    JSON.stringify([dispIssue.action, dispIssue.disposition, dispIssue.dispositionNote])
   )
 
   // ============================================================

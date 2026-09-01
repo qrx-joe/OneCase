@@ -5,6 +5,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { calculatePriority } from '@onecase/domain'
+import { ISSUE_DISPOSITIONS, type IssueDisposition } from '@onecase/contracts'
 import { generateCaseNumber } from '@/lib/case-number'
 
 export interface ConfirmIntakeParams {
@@ -15,6 +16,10 @@ export interface ConfirmIntakeParams {
     issueIndex: number
     decision: 'CREATE_CASE' | 'LINK_EXISTING' | 'REJECTED'
     targetCaseId?: string
+    /** 不建事项的业务出口;仅 REJECTED 决策允许携带 */
+    disposition?: IssueDisposition
+    /** 暂不受理(DEFERRED)必须填写原因,其他处置选填 */
+    dispositionNote?: string
     /** 人工编辑后的草稿字段;缺省字段沿用 AI 原值 */
     edit?: {
       title?: string
@@ -28,6 +33,7 @@ export interface ConfirmIntakeResult {
   success: boolean
   createdCases: Array<{ id: string; caseNumber: string }>
   linkedCases: Array<{ caseId: string; caseNumber: string }>
+  disposedIssues: Array<{ issueIndex: number; disposition: IssueDisposition }>
   errors: string[]
 }
 
@@ -50,6 +56,7 @@ export async function confirmIntake(params: ConfirmIntakeParams): Promise<Confir
     success: false,
     createdCases: [],
     linkedCases: [],
+    disposedIssues: [],
     errors: [],
   }
 
@@ -111,6 +118,23 @@ export async function confirmIntake(params: ConfirmIntakeParams): Promise<Confir
           throw new Error('TARGET_CASE_ID_REQUIRED')
         }
         if (decision.decision !== 'LINK_EXISTING' && decision.targetCaseId) {
+          throw new Error('INVALID_ISSUE_DECISION')
+        }
+        // 不建事项必须给出业务出口 (S1-T5): REJECTED 必带 disposition,
+        // 暂不受理(DEFERRED)必填原因;其余决策携带 disposition 视为歧义请求
+        const VALID_DISPOSITIONS = new Set<string>(ISSUE_DISPOSITIONS)
+        if (decision.decision === 'REJECTED') {
+          if (!decision.disposition || !VALID_DISPOSITIONS.has(decision.disposition)) {
+            throw new Error('DISPOSITION_REQUIRED')
+          }
+          const note = decision.dispositionNote?.trim() || ''
+          if (decision.disposition === 'DEFERRED' && !note) {
+            throw new Error('DEFERRED_NOTE_REQUIRED')
+          }
+          if (note.length > 200) {
+            throw new Error('DISPOSITION_NOTE_TOO_LONG')
+          }
+        } else if (decision.disposition || decision.dispositionNote) {
           throw new Error('INVALID_ISSUE_DECISION')
         }
         if (seenIndexes.has(decision.issueIndex)) {
@@ -286,10 +310,18 @@ export async function confirmIntake(params: ConfirmIntakeParams): Promise<Confir
             data: { action: 'LINK_EXISTING', confirmedCaseId: targetCase.id },
           })
         } else {
-          // REJECTED: 显式留痕 (拒绝也是人工决策,不留在无记录状态)
+          // REJECTED: 显式留痕 (不建事项也是人工决策,记录业务出口与原因)
           await tx.intakeIssue.update({
             where: { id: issue.id },
-            data: { action: 'REJECTED' },
+            data: {
+              action: 'REJECTED',
+              disposition: decision.disposition,
+              dispositionNote: decision.dispositionNote?.trim() || undefined,
+            },
+          })
+          result.disposedIssues.push({
+            issueIndex: decision.issueIndex,
+            disposition: decision.disposition as IssueDisposition,
           })
         }
       }
