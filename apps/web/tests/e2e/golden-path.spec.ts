@@ -29,7 +29,7 @@ test('1 Intake → 2 Issues → 一关联一新建 → Case Detail 来源+审计
 
   const draft1 = page.locator('.draft-card', { hasText: '事项 1 / 2' })
   const draft2 = page.locator('.draft-card', { hasText: '事项 2 / 2' })
-  await expect(draft1.getByText('AI 草稿 · 未写入 Case')).toBeVisible()
+  await expect(draft1.getByText('AI 草稿 · 未写入事项')).toBeVisible()
   await expect(draft1.getByLabel('事项标题')).toHaveValue('3栋2单元楼道照明故障')
   await expect(draft2.getByLabel('事项标题')).toHaveValue('3栋楼下垃圾未及时清运')
   await expect(draft1.getByText(/缺失信息/)).toBeVisible()
@@ -42,13 +42,13 @@ test('1 Intake → 2 Issues → 一关联一新建 → Case Detail 来源+审计
   ).toBeVisible()
   await dupCard1
     .locator('.dup-item', { hasText: 'CASE-018' })
-    .getByRole('button', { name: '关联此 Case' })
+    .getByRole('button', { name: '关联此事项' })
     .click()
   await expect(page.getByText('✓ 将关联 CASE-018')).toBeVisible()
 
   // 4. 事项 2: 创建新 Case
-  await draft2.getByRole('button', { name: '创建新 Case' }).click()
-  await expect(page.getByText('✓ 将创建新 Case')).toBeVisible()
+  await draft2.getByRole('button', { name: '新建事项' }).click()
+  await expect(page.getByText('✓ 将新建事项')).toBeVisible()
 
   // 5. 确认全部决策: alert 汇总 "关联 1 + 创建 1",随后回首页
   await page.getByRole('button', { name: '确认全部决策' }).click()

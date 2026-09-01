@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
           })),
         meta: {
           demoMode: true,
-          note: 'Demo 数据 · 仅统计已确认 Case,不含 AI 草稿',
+          note: 'Demo 数据 · 仅统计已确认事项，不含 AI 草稿',
         },
       },
     })

@@ -50,7 +50,7 @@ export function DuplicateCandidateCard({
 
       <div className="flex gap-2 pt-2">
         <button onClick={onLink} className="px-3 py-1.5 text-xs bg-oc-blue text-white rounded-md hover:bg-oc-blue-hover">
-          关联此 Case
+          关联此事项
         </button>
         <button onClick={onDismiss} className="px-3 py-1.5 text-xs border rounded-md hover:bg-gray-50">
           不是同一事项

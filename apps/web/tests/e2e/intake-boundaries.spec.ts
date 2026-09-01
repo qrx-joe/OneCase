@@ -23,7 +23,7 @@ for (const status of ['PENDING', 'ANALYZING', 'ANALYZED', 'CONFIRMED']) {
       await expect(page).toHaveURL(/\/cases$/)
     } else if (status === 'ANALYZED') {
       await expect(page).toHaveURL(new RegExp(`/intake/${data.id}/review$`))
-      await expect(page.getByText('AI 草稿 · 未写入 Case').first()).toBeVisible()
+      await expect(page.getByText('AI 草稿 · 未写入事项').first()).toBeVisible()
     } else {
       await expect(page).toHaveURL(new RegExp(`/intake\\?intakeId=${data.id}$`))
       await expect(page.getByLabel('居民原始信息')).toHaveValue(rawText)

@@ -34,7 +34,7 @@ export function AppLayout({ children, title }: AppLayoutProps) {
     },
     {
       href: '/intake',
-      label: '新建 Intake',
+      label: '居民来件',
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M12 5v14M5 12h14" />

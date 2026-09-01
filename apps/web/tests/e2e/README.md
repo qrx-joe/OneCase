@@ -14,9 +14,9 @@ TASK.md Phase 2 验收路径,真实断言,任何一步失败即测试失败:
 
 ```
 1. /intake 填入多事项文本 → "AI 整理为事项"
-2. 跳转 Review 页,断言: 2 个草稿 + "AI 草稿 · 未写入 Case" + 缺失字段提示
-3. 事项 1 候选区: Hard Negative CASE-011 标注"位置不同";点 CASE-018 "关联此 Case"
-4. 事项 2 点"创建新 Case"
+2. 跳转 Review 页,断言: 2 个草稿 + "AI 草稿 · 未写入事项" + 缺失字段提示
+3. 事项 1 候选区: Hard Negative CASE-011 标注"位置不同";点 CASE-018 "关联此事项"
+4. 事项 2 点"新建事项"
 5. "确认全部决策" → alert 汇总 "关联 1 个: CASE-018 + 创建 1 个: CASE-XXXX" → 回首页
 6. /cases/CASE-018: 居民来源 +1、原始引用、Timeline 出现关联审计
 ```

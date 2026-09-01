@@ -51,7 +51,7 @@ for (const { recovery, refresh } of [
       await expect(page.getByText(/原始反馈已保存,不会丢失/)).toBeVisible()
     } else {
       await page.waitForURL(/\/intake\/.+\/review/)
-      await expect(page.getByText('AI 草稿 · 未写入 Case').first()).toBeVisible()
+      await expect(page.getByText('AI 草稿 · 未写入事项').first()).toBeVisible()
     }
     expect(intakePosts).toBe(1)
     // Review 会幂等读取分析结果,开发模式还会重复执行 effect;这些请求也必须复用原 Intake。
@@ -77,10 +77,10 @@ for (const { recovery, refresh } of [
       expect(analysis.errorMessage).toContain('API key is required')
     }
 
-    await page.getByRole('button', { name: '改为手动创建 Case' }).click()
+    await page.getByRole('button', { name: '改为手动创建事项' }).click()
     await page.waitForURL(`**/cases/new?intakeId=${intakeId}`)
     await page.getByLabel('事项标题 *').fill('南门路灯杆倾斜')
-    await page.getByRole('button', { name: '创建 Case', exact: true }).click()
+    await page.getByRole('button', { name: '创建事项', exact: true }).click()
     await page.waitForURL(/\/cases\/CASE-\d+/)
     await expect(page.getByText('1 条居民反馈已关联')).toBeVisible()
     await expect(page.getByText(`"${RAW_TEXT}"`, { exact: true })).toBeVisible()

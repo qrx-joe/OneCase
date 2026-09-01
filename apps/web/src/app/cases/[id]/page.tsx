@@ -52,7 +52,7 @@ interface CaseDetail {
 const STATUS_LABELS: Record<string, { label: string; variant: 'blue' | 'orange' | 'green' | 'gray' }> = {
   OPEN: { label: '待处理', variant: 'blue' },
   IN_PROGRESS: { label: '处理中', variant: 'orange' },
-  WAITING: { label: '等待外部', variant: 'gray' },
+  WAITING: { label: '等待物业/街道', variant: 'gray' },
   RESOLVED: { label: '已解决', variant: 'green' },
   CLOSED: { label: '已关闭', variant: 'gray' },
   CANCELED: { label: '已取消', variant: 'gray' },
@@ -278,7 +278,7 @@ export default function CaseDetailPage() {
               </div>
               <div className="meta-item">
                 <label>负责人</label>
-                <div>{caseData.assigneeId ? `用户 ${caseData.assigneeId.slice(0, 8)}…` : '待分派'}</div>
+                <div>{caseData.assigneeId ? '已分派' : '待分派'}</div>
               </div>
             </div>
           </div>
@@ -287,7 +287,7 @@ export default function CaseDetailPage() {
             <h3>居民来源 · {caseData.sources.length}</h3>
             {caseData.sources.length === 0 ? (
               <p style={{ fontSize: 10, color: 'var(--text-3)', padding: '12px 0' }}>
-                暂无关联的居民反馈 (此 Case 由人工直接创建)
+                暂无关联的居民反馈 (此事项由人工直接创建)
               </p>
             ) : (
               caseData.sources.map((source) => (

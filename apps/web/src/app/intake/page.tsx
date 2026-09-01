@@ -68,7 +68,7 @@ export default function NewIntakePage() {
           setCreatedImageUrl(savedImage.url)
           setMode('image')
         }
-        setError('已恢复原始反馈,可重试分析或改为手动创建 Case。')
+        setError('已恢复原始反馈,可重试分析或改为手动创建事项。')
       } catch (e) {
         if (active) setError(e instanceof Error ? e.message : '恢复失败,请刷新重试。')
       } finally {
@@ -245,14 +245,14 @@ export default function NewIntakePage() {
             <div className={`step ${loading ? 'active' : ''}`}>
               <div className="step-num">2</div>
               <div>
-                <b>AI 事件化</b>
+                <b>AI 草拟</b>
                 <small>拆分问题、提取事实、标记缺失</small>
               </div>
             </div>
             <div className="step">
               <div className="step-num">3</div>
               <div>
-                <b>搜索相似 Case</b>
+                <b>搜索相似事项</b>
                 <small>语义 + 地点 + 类别 + 时间</small>
               </div>
             </div>
@@ -260,7 +260,7 @@ export default function NewIntakePage() {
               <div className="step-num">4</div>
               <div>
                 <b>人工确认</b>
-                <small>创建新 Case 或关联已有 Case</small>
+                <small>新建事项或关联已有事项</small>
               </div>
             </div>
           </div>
@@ -323,7 +323,7 @@ export default function NewIntakePage() {
               </div>
               <div className="process-line">
                 <span style={{ width: 13 }}></span>
-                <span>搜索相似 Case</span>
+                <span>搜索相似事项</span>
               </div>
             </div>
           </div>
@@ -360,7 +360,7 @@ export default function NewIntakePage() {
                 size="sm"
                 onClick={() => router.push(`/cases/new?intakeId=${createdIntakeId}`)}
               >
-                改为手动创建 Case
+                改为手动创建事项
               </Button>
             )}
           </div>

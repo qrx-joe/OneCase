@@ -1,5 +1,5 @@
 // app/cases/new/page.tsx
-// 手动创建 Case: AI 不可用时的兜底路径 (TASK.md: 异常情况下仍可手动创建 Case)
+// 手动创建事项: AI 不可用时的兜底路径 (TASK.md: 异常情况下仍可手动创建事项)
 // 携带 ?intakeId= 时,把 AI 失败前已保存的原始反馈关联为本 Case 的居民来源
 'use client'
 
@@ -65,10 +65,10 @@ function ManualCaseForm() {
   }
 
   return (
-    <AppLayout title="手动创建 Case">
+    <AppLayout title="手动创建事项">
       <div className="page-head">
         <div>
-          <h2>手动创建 Case</h2>
+          <h2>手动创建事项</h2>
           <p>AI 不可用或信息已明确时,人工直接登记事项。创建即为业务事实。</p>
         </div>
       </div>
@@ -80,7 +80,7 @@ function ManualCaseForm() {
             <path d="M5 14v5h14v-5" />
           </svg>
           <span>
-            将把 AI 分析失败前保存的原始反馈关联为本 Case 的居民来源 (原始信息不丢失)。
+            将把 AI 分析失败前保存的原始反馈关联为本事项的居民来源 (原始信息不丢失)。
           </span>
         </div>
       )}
@@ -180,7 +180,7 @@ function ManualCaseForm() {
               取消
             </Button>
             <Button variant="primary" onClick={handleSubmit} disabled={!canSubmit}>
-              {submitting ? '创建中...' : '创建 Case'}
+              {submitting ? '创建中...' : '创建事项'}
             </Button>
           </div>
         </div>
@@ -193,7 +193,7 @@ export default function NewCasePage() {
   return (
     <Suspense
       fallback={
-        <AppLayout title="手动创建 Case">
+        <AppLayout title="手动创建事项">
           <div />
         </AppLayout>
       }

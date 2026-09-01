@@ -23,7 +23,7 @@ test('编辑地点 → 清除旧关联选择 + 候选按新地点重查', async 
   // 先基于旧候选选择关联 CASE-018
   await dupCard1
     .locator('.dup-item', { hasText: 'CASE-018' })
-    .getByRole('button', { name: '关联此 Case' })
+    .getByRole('button', { name: '关联此事项' })
     .click()
   await expect(page.getByText('✓ 将关联 CASE-018')).toBeVisible()
 
@@ -49,7 +49,7 @@ test('编辑地点 → 清除旧关联选择 + 候选按新地点重查', async 
   // 4) 重查后可以基于新候选重新关联
   await dupCard1
     .locator('.dup-item', { hasText: 'CASE-011' })
-    .getByRole('button', { name: '关联此 Case' })
+    .getByRole('button', { name: '关联此事项' })
     .click()
   await expect(page.getByText('✓ 将关联 CASE-011')).toBeVisible()
 })
@@ -116,8 +116,8 @@ test('刷新在途时旧候选不可关联且确认禁用;迟到的旧响应不�
   await expect(dupCard1.locator('.dup-item', { hasText: 'CASE-018' })).toBeVisible()
 
   // 两个事项都选择"创建新 Case" → 全部决策就绪,确认按钮可用
-  await page.locator('.draft-card', { hasText: '事项 1 / 2' }).getByRole('button', { name: '创建新 Case' }).click()
-  await page.locator('.draft-card', { hasText: '事项 2 / 2' }).getByRole('button', { name: '创建新 Case' }).click()
+  await page.locator('.draft-card', { hasText: '事项 1 / 2' }).getByRole('button', { name: '新建事项' }).click()
+  await page.locator('.draft-card', { hasText: '事项 2 / 2' }).getByRole('button', { name: '新建事项' }).click()
   await expect(page.getByRole('button', { name: '确认全部决策' })).toBeEnabled()
 
   // 编辑地点 → 旧候选立即清空 (无关联按钮可点),确认按钮禁用

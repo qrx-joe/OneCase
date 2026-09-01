@@ -21,7 +21,7 @@ interface CaseRow {
 const STATUS_BADGES: Record<string, { label: string; variant: 'blue' | 'orange' | 'green' | 'gray' }> = {
   OPEN: { label: '待处理', variant: 'blue' },
   IN_PROGRESS: { label: '处理中', variant: 'orange' },
-  WAITING: { label: '等待外部', variant: 'gray' },
+  WAITING: { label: '等待物业/街道', variant: 'gray' },
   RESOLVED: { label: '已解决', variant: 'green' },
   CLOSED: { label: '已关闭', variant: 'gray' },
   CANCELED: { label: '已取消', variant: 'gray' },

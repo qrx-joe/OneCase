@@ -34,10 +34,10 @@ test('Review 页编辑草稿 → 确认后 Case 使用人工修改值', async ({
   await expect(dupCard1.locator('.dup-item').first()).toBeVisible()
   await dupCard1
     .locator('.dup-item', { hasText: 'CASE-018' })
-    .getByRole('button', { name: '关联此 Case' })
+    .getByRole('button', { name: '关联此事项' })
     .click()
 
-  await draft2.getByRole('button', { name: '创建新 Case' }).click()
+  await draft2.getByRole('button', { name: '新建事项' }).click()
   await page.getByRole('button', { name: '确认全部决策' }).click()
   await page.waitForURL((url) => url.pathname === '/')
 

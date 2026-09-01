@@ -30,7 +30,7 @@ export function AIDraftCard({
         <h3 className="text-sm font-semibold">事项 {issueIndex + 1} / {totalIssues}</h3>
         <div className="flex items-center gap-2 text-purple-600">
           <span className="text-xs">✦</span>
-          <span className="text-xs font-bold">AI 草稿 · 未写入 Case</span>
+          <span className="text-xs font-bold">AI 草稿 · 未写入事项</span>
         </div>
       </div>
 

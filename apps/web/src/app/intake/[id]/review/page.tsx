@@ -301,7 +301,7 @@ export default function IntakeReviewPage() {
               返回重新输入
             </Button>
             <Button variant="primary" onClick={() => router.push(`/cases/new?intakeId=${intakeId}`)}>
-              改为手动创建 Case
+              改为手动创建事项
             </Button>
           </div>
           <p style={{ color: 'var(--text-3)', fontSize: 11, marginTop: 16 }}>
@@ -354,7 +354,7 @@ export default function IntakeReviewPage() {
                   <h3>事项 {idx + 1} / {issues.length}</h3>
                   <div className="ai-label">
                     <span className="ai-spark">✦</span>
-                    AI 草稿 · 未写入 Case
+                    AI 草稿 · 未写入事项
                   </div>
                 </div>
 
@@ -429,13 +429,13 @@ export default function IntakeReviewPage() {
                   <span style={{ fontSize: 10, color: 'var(--text-3)' }}>
                     {decision
                       ? decision.decision === 'CREATE_CASE'
-                        ? '✓ 将创建新 Case'
+                        ? '✓ 将新建事项'
                         : decision.decision === 'LINK_EXISTING'
                         ? (() => {
                             const linked = (candidates[idx] || []).find(
                               (c) => c.caseId === decision.targetCaseId
                             )
-                            return linked ? `✓ 将关联 ${linked.caseNumber}` : '✓ 将关联已有 Case'
+                            return linked ? `✓ 将关联 ${linked.caseNumber}` : '✓ 将关联已有事项'
                           })()
                         : '已跳过'
                       : '请选择操作'}
@@ -453,7 +453,7 @@ export default function IntakeReviewPage() {
                       size="sm"
                       onClick={() => setDecision(idx, 'CREATE_CASE')}
                     >
-                      创建新 Case
+                      新建事项
                     </Button>
                   </div>
                 </div>
@@ -481,7 +481,7 @@ export default function IntakeReviewPage() {
                 {dupErrors[idx] ? (
                   <div style={{ padding: '20px 15px' }}>
                     <p style={{ fontSize: 10, color: '#C92F27', textAlign: 'center' }}>
-                      候选检索失败,可继续创建新 Case
+                      候选检索失败，可继续新建事项
                     </p>
                   </div>
                 ) : issueCandidates.length === 0 ? (
@@ -489,7 +489,7 @@ export default function IntakeReviewPage() {
                     <p style={{ fontSize: 10, color: 'var(--text-3)', textAlign: 'center' }}>
                       {staleCandidates[idx]
                         ? '正在按修改后的草稿重新检索…'
-                        : '暂无相似候选,建议创建新 Case'}
+                        : '暂无相似候选，建议新建'}
                     </p>
                   </div>
                 ) : (
@@ -517,7 +517,7 @@ export default function IntakeReviewPage() {
                           disabled={staleCandidates[idx]}
                           onClick={() => setDecision(idx, 'LINK_EXISTING', c.caseId)}
                         >
-                          关联此 Case
+                          关联此事项
                         </Button>
                         <a
                           href={`/cases/${c.caseNumber}`}

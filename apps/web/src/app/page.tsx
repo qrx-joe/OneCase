@@ -32,7 +32,7 @@ interface DashboardData {
 const STATUS_BADGES: Record<string, { label: string; variant: 'blue' | 'orange' | 'green' | 'gray' }> = {
   OPEN: { label: '待处理', variant: 'blue' },
   IN_PROGRESS: { label: '处理中', variant: 'orange' },
-  WAITING: { label: '等待外部', variant: 'gray' },
+  WAITING: { label: '等待物业/街道', variant: 'gray' },
   RESOLVED: { label: '已解决', variant: 'green' },
   CLOSED: { label: '已关闭', variant: 'gray' },
   CANCELED: { label: '已取消', variant: 'gray' },
@@ -144,7 +144,7 @@ export default function HomePage() {
         </div>
         <div className="actions">
           <Link href="/intake">
-            <Button variant="primary">+ 新建 Intake</Button>
+            <Button variant="primary">+ 居民来件</Button>
           </Link>
         </div>
       </div>
@@ -220,7 +220,7 @@ export default function HomePage() {
           {filteredCases.length === 0 ? (
             <div style={{ padding: '36px 15px', textAlign: 'center' }}>
               <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 12 }}>
-                {cases.length === 0 ? '暂无事项,从新建 Intake 开始' : '没有符合筛选条件的事项'}
+                {cases.length === 0 ? '暂无事项，从居民来件开始' : '没有符合筛选条件的事项'}
               </p>
               {cases.length > 0 && (
                 <Button variant="ghost" size="sm" onClick={() => { setFilter('all'); setSearchQuery('') }}>
@@ -312,7 +312,7 @@ export default function HomePage() {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 3l2.1 4.8L19 10l-4.9 2.2L12 17l-2.1-4.8L5 10l4.9-2.2z" />
             </svg>
-            <span>{dashboard?.meta?.note || 'Demo 数据 · 仅统计已确认 Case'}</span>
+            <span>{dashboard?.meta?.note || 'Demo 数据 · 仅统计已确认事项'}</span>
           </div>
         </div>
       </div>
