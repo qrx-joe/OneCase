@@ -1,9 +1,12 @@
 // app/cases/page.tsx
 // 全部事项 - Case 列表页 (真实数据)
+// 支持 URL 参数初始化筛选 (S1-T4: 顶栏搜索/通知铃铛跳转目标):
+//   ?q=关键词  ?status=OPEN|IN_PROGRESS  ?stalled=7 (超N天未更新)
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { AppLayout } from '@/components/AppLayout'
 import { Button, Badge } from '@/components'
 
@@ -16,6 +19,7 @@ interface CaseRow {
   categoryCode?: string | null
   locationText?: string | null
   createdAt: string
+  updatedAt: string
 }
 
 const STATUS_BADGES: Record<string, { label: string; variant: 'blue' | 'orange' | 'green' | 'gray' }> = {
@@ -35,11 +39,16 @@ const CATEGORY_LABELS: Record<string, string> = {
   PARKING: '停车管理',
 }
 
-export default function CasesPage() {
+function CasesView() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const statusFilter = searchParams.get('status') || ''
+  const stalledDays = Number(searchParams.get('stalled')) || 0
+
   const [cases, setCases] = useState<CaseRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '')
 
   useEffect(() => {
     async function load() {
@@ -61,7 +70,15 @@ export default function CasesPage() {
     load()
   }, [])
 
+  const stalledBefore = useMemo(
+    () => Date.now() - stalledDays * 24 * 60 * 60 * 1000,
+    [stalledDays]
+  )
+
   const filtered = cases.filter((c) => {
+    if (statusFilter && c.status !== statusFilter) return false
+    if (stalledDays > 0 && new Date(c.updatedAt).getTime() > stalledBefore) return false
+
     const q = searchQuery.trim().toLowerCase()
     if (!q) return true
     return (
@@ -71,6 +88,15 @@ export default function CasesPage() {
       (c.categoryCode ? (CATEGORY_LABELS[c.categoryCode] || c.categoryCode).toLowerCase().includes(q) : false)
     )
   })
+
+  const hasUrlFilter = Boolean(statusFilter || stalledDays > 0 || searchParams.get('q'))
+  const filterChips: Array<{ label: string }> = []
+  if (statusFilter) {
+    filterChips.push({ label: `状态：${STATUS_BADGES[statusFilter]?.label || statusFilter}` })
+  }
+  if (stalledDays > 0) {
+    filterChips.push({ label: `超过 ${stalledDays} 天未更新` })
+  }
 
   if (loading) {
     return (
@@ -111,6 +137,7 @@ export default function CasesPage() {
             className="field"
             style={{ width: 240 }}
             placeholder="搜索编号、标题、地点、类别..."
+            aria-label="搜索事项"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -120,15 +147,41 @@ export default function CasesPage() {
         </div>
       </div>
 
+      {hasUrlFilter && (
+        <div className="filter-row" style={{ marginBottom: 12 }}>
+          {filterChips.map((chip) => (
+            <span key={chip.label} className="chip active" aria-label="当前筛选">
+              {chip.label}
+            </span>
+          ))}
+          <button
+            className="chip"
+            onClick={() => {
+              setSearchQuery('')
+              router.replace('/cases')
+            }}
+          >
+            清除筛选 ×
+          </button>
+        </div>
+      )}
+
       <div className="work-card">
         {filtered.length === 0 ? (
           <div style={{ padding: 48, textAlign: 'center' }}>
             <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 12 }}>
-              {cases.length === 0 ? '暂无事项' : '没有符合搜索条件的事项'}
+              {cases.length === 0 ? '暂无事项' : '没有符合筛选条件的事项'}
             </p>
             {cases.length > 0 && (
-              <Button variant="ghost" size="sm" onClick={() => setSearchQuery('')}>
-                清除搜索
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSearchQuery('')
+                  if (hasUrlFilter) router.replace('/cases')
+                }}
+              >
+                清除筛选
               </Button>
             )}
           </div>
@@ -177,5 +230,19 @@ export default function CasesPage() {
         )}
       </div>
     </AppLayout>
+  )
+}
+
+export default function CasesPage() {
+  return (
+    <Suspense
+      fallback={
+        <AppLayout title="全部事项">
+          <div />
+        </AppLayout>
+      }
+    >
+      <CasesView />
+    </Suspense>
   )
 }

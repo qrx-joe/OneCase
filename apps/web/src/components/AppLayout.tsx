@@ -1,10 +1,10 @@
-// components/AppLayout.tsx
 // 统一的 App 布局 (侧边栏 + 顶栏 + 内容区)
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { summarizeNotifications, type NotificationSummary } from '@/lib/notification-summary'
 
 interface AppLayoutProps {
   children: React.ReactNode
@@ -13,7 +13,11 @@ interface AppLayoutProps {
 
 export function AppLayout({ children, title }: AppLayoutProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
+  const [summary, setSummary] = useState<NotificationSummary | null>(null)
+  const [notifOpen, setNotifOpen] = useState(false)
+  const notifRef = useRef<HTMLDivElement>(null)
 
   // count: Phase 4 数据概览页恢复后使用的角标位
   const navItems: Array<{
@@ -52,6 +56,44 @@ export function AppLayout({ children, title }: AppLayoutProps) {
       ),
     },
   ]
+
+  // 通知汇总: 复用 /api/cases 活跃列表,失败时保持 null (不显示数字,不阻塞布局)
+  useEffect(() => {
+    const controller = new AbortController()
+    fetch('/api/cases', { cache: 'no-store', signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error('failed'))))
+      .then((body) => {
+        if (!controller.signal.aborted && Array.isArray(body?.data)) {
+          setSummary(summarizeNotifications(body.data))
+        }
+      })
+      .catch(() => { /* 汇总获取失败只影响铃铛数字,不报错 */ })
+    return () => controller.abort()
+  }, [pathname])
+
+  // 点击面板外部关闭下拉
+  useEffect(() => {
+    if (!notifOpen) return
+    const close = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [notifOpen])
+
+  const submitSearch = () => {
+    const q = searchQuery.trim()
+    router.push(q ? `/cases?q=${encodeURIComponent(q)}` : '/cases')
+  }
+
+  const notifRows = summary
+    ? [
+        { label: '待处理', value: summary.open, href: '/cases?status=OPEN' },
+        { label: '处理中', value: summary.inProgress, href: '/cases?status=IN_PROGRESS' },
+        { label: '超 7 天未更新', value: summary.stalled, href: '/cases?stalled=7' },
+      ].filter((row) => row.value > 0)
+    : []
+  const notifTotal = notifRows.reduce((sum, row) => sum + row.value, 0)
 
   return (
     <div className="app-shell">
@@ -109,17 +151,52 @@ export function AppLayout({ children, title }: AppLayoutProps) {
             </svg>
             <input
               type="text"
-              placeholder="搜索事项、地点、编号…"
+              placeholder="搜索事项、地点、编号，回车查看…"
+              aria-label="全局搜索事项"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') submitSearch()
+              }}
             />
           </div>
-          <button className="icon-btn" title="通知">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 8a6 6 0 10-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
-              <path d="M10 21h4" />
-            </svg>
-          </button>
+          <div className="notif-wrap" ref={notifRef}>
+            <button
+              className="icon-btn"
+              title="待办通知"
+              aria-label={`待办通知${summary ? `，共 ${notifTotal} 项` : ''}`}
+              aria-expanded={notifOpen}
+              onClick={() => setNotifOpen((open) => !open)}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 8a6 6 0 10-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+                <path d="M10 21h4" />
+              </svg>
+              {summary !== null && notifTotal > 0 && <span className="notif-badge">{notifTotal}</span>}
+            </button>
+            {notifOpen && (
+              <div className="notif-dropdown" role="menu" aria-label="待办通知">
+                {notifRows.length === 0 ? (
+                  <p className="notif-empty">
+                    {summary ? '暂无待办，所有事项都在跟进中。' : '通知加载失败，请稍后重试。'}
+                  </p>
+                ) : (
+                  notifRows.map((row) => (
+                    <Link
+                      key={row.href}
+                      href={row.href}
+                      className="notif-item"
+                      role="menuitem"
+                      onClick={() => setNotifOpen(false)}
+                    >
+                      <span>{row.label}</span>
+                      <b>{row.value}</b>
+                    </Link>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
         </header>
 
         <div className="app-content">{children}</div>

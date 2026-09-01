@@ -1223,6 +1223,69 @@ a {
   color: var(--text);
 }
 
+/* ===== 通知铃铛下拉 (S1-T4) ===== */
+.notif-wrap {
+  position: relative;
+}
+
+.icon-btn .notif-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--oc-red, #FF3B30);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+}
+
+.notif-dropdown {
+  position: absolute;
+  top: 44px;
+  right: 0;
+  width: 200px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
+  padding: 6px;
+  z-index: 200;
+}
+
+.notif-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--text-2);
+  text-decoration: none;
+  transition: background var(--t-fast) var(--ease);
+}
+
+.notif-item:hover {
+  background: var(--gray-100);
+  color: var(--text);
+}
+
+.notif-item b {
+  font-size: 12px;
+  color: var(--oc-red, #FF3B30);
+}
+
+.notif-empty {
+  padding: 10px 12px;
+  font-size: 11px;
+  color: var(--text-3);
+  margin: 0;
+}
+
 /* ===== Form fields ===== */
 .field {
   width: 100%;
