@@ -84,27 +84,40 @@ export default function IntakeReviewPage() {
         if (data.data.issues?.length > 0) {
           const issuesInput = data.data.issues as Issue[]
           const versions = issuesInput.map((_, idx) => queryVersionRef.current[idx] ?? 0)
-          const allCandidates = await Promise.all(
-            issuesInput.map(async (issue: Issue, idx: number) => {
-              try {
-                const dupRes = await fetch('/api/duplicates/find', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    title: issue.title,
-                    categoryCode: issue.categoryCode,
-                    locationText: issue.locationText,
-                    organizationId: 'demo-org',
-                  }),
-                })
-                const dupData = await dupRes.json()
-                // 编辑触发的重查已接管 (版本号被顶替) → 丢弃初始结果
-                if ((queryVersionRef.current[idx] ?? 0) !== versions[idx]) return []
-                return dupRes.ok && dupData.data?.candidates ? dupData.data.candidates : []
-              } catch {
-                return [] // Duplicate 检索失败不阻塞 Review
+          // 查重失败与"确实无候选"必须区分: 失败不允许预填新建 (审查报告 P1)
+          const allResults = await Promise.all(
+            issuesInput.map(
+              async (
+                issue: Issue,
+                idx: number
+              ): Promise<{ ok: boolean; list: DuplicateCandidate[]; superseded: boolean }> => {
+                try {
+                  const dupRes = await fetch('/api/duplicates/find', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      title: issue.title,
+                      categoryCode: issue.categoryCode,
+                      locationText: issue.locationText,
+                      organizationId: 'demo-org',
+                    }),
+                  })
+                  const dupData = await dupRes.json()
+                  // 编辑触发的重查已接管 (版本号被顶替) → 丢弃初始结果
+                  if ((queryVersionRef.current[idx] ?? 0) !== versions[idx]) {
+                    return { ok: true, list: [], superseded: true }
+                  }
+                  return {
+                    ok: dupRes.ok,
+                    list:
+                      dupRes.ok && dupData.data?.candidates ? dupData.data.candidates : [],
+                    superseded: false,
+                  }
+                } catch {
+                  return { ok: false, list: [], superseded: false } // 检索失败不阻塞 Review
+                }
               }
-            })
+            )
           )
           // 用户在初始候选返回前已编辑草稿 → 不回填旧值候选,标记过期交给刷新 effect 重查
           const editedIdx = issuesInput
@@ -112,11 +125,33 @@ export default function IntakeReviewPage() {
             .filter(
               (idx) =>
                 editsRef.current[idx]?.title !== undefined ||
-                editsRef.current[idx]?.locationText !== undefined
+                editsRef.current[idx]?.locationText !== undefined ||
+                allResults[idx].superseded
             )
-          setCandidates(allCandidates.map((list, idx) => (editedIdx.includes(idx) ? [] : list)))
-          // S1-T6: 初始候选为空的 Issue 预填"新建事项";已编辑(候选过期)与有候选的不预填
-          setDecisions((prev) => prefillCreateForEmptyCandidates(prev, allCandidates, { skip: editedIdx }))
+          // 失败的查询既不展示候选,也不允许预填 (防止查重故障被解释为"无相似事项")
+          const failedIdx = allResults
+            .map((result, idx) => (result.ok ? -1 : idx))
+            .filter((idx) => idx >= 0 && !editedIdx.includes(idx))
+
+          setCandidates(allResults.map((result, idx) => (editedIdx.includes(idx) ? [] : result.list)))
+          if (failedIdx.length > 0) {
+            setDupErrors((prev) => {
+              const next = { ...prev }
+              failedIdx.forEach((idx) => {
+                next[idx] = true
+              })
+              return next
+            })
+          }
+          // S1-T6: 仅"查询成功且确实无候选"的 Issue 预填"新建事项";
+          // 已编辑(候选过期)与检索失败的一律不预填 (skip)
+          setDecisions((prev) =>
+            prefillCreateForEmptyCandidates(
+              prev,
+              allResults.map((result) => result.list),
+              { skip: [...editedIdx, ...failedIdx] }
+            )
+          )
           // 记录本次候选使用的草稿值,后续编辑据此判断是否过期
           issuesInput.forEach((issue: Issue, idx: number) => {
             lastQueryRef.current[idx] = {
