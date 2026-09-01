@@ -12,14 +12,14 @@ export interface PrefillDecision {
  * - skip 中的 Issue 不预填 (候选刷新在途等未定状态)
  * - 返回原对象引用表示无变化 (减少无效渲染)
  */
-export function prefillCreateForEmptyCandidates(
-  decisions: Record<number, { decision: string } | undefined>,
+export function prefillCreateForEmptyCandidates<D extends { decision: string }>(
+  decisions: Partial<Record<number, D>>,
   candidatesByIssue: unknown[][],
   options: { skip?: number[] } = {}
-): Record<number, PrefillDecision> {
+): Record<number, D | PrefillDecision> {
   const skip = new Set(options.skip ?? [])
   let changed = false
-  const next: Record<number, PrefillDecision> = { ...decisions }
+  const next = { ...decisions } as Record<number, D | PrefillDecision>
 
   candidatesByIssue.forEach((candidates, idx) => {
     // 稀疏数组中未提供的下标视为"未定",不预填 (如单个 Issue 的候选刷新)
@@ -31,5 +31,5 @@ export function prefillCreateForEmptyCandidates(
     }
   })
 
-  return changed ? next : (decisions as Record<number, PrefillDecision>)
+  return changed ? next : (decisions as unknown as Record<number, D | PrefillDecision>)
 }
