@@ -201,6 +201,21 @@ export function AppLayout({ children, title }: AppLayoutProps) {
 
         <div className="app-content">{children}</div>
       </main>
+
+      {/* 移动端底部导航: ≤768px 侧栏隐藏时的替代入口 (S1-T1) */}
+      <nav className="mobile-nav" aria-label="移动端主导航">
+        {navItems.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={pathname === item.href ? 'active' : ''}
+            aria-current={pathname === item.href ? 'page' : undefined}
+          >
+            {item.icon}
+            <span>{item.label}</span>
+          </Link>
+        ))}
+      </nav>
     </div>
   )
 }

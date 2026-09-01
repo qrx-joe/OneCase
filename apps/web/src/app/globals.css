@@ -1618,6 +1618,118 @@ textarea.field {
   }
 }
 
+/* ===== 移动端底部导航 (S1-T1) ===== */
+.mobile-nav {
+  display: none;
+}
+
+/* ===== 移动优先关键路径 (S1-T1 / S1-T2) ===== */
+@media (max-width: 768px) {
+  .mobile-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 150;
+    display: flex;
+    justify-content: space-around;
+    background: rgba(255, 255, 255, 0.96);
+    border-top: 1px solid var(--border);
+    backdrop-filter: blur(18px);
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .mobile-nav a {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    flex: 1;
+    max-width: 120px;
+    padding: 7px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-3);
+    text-decoration: none;
+  }
+
+  .mobile-nav svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .mobile-nav a.active {
+    color: var(--oc-blue);
+  }
+
+  /* 底部导航固定悬浮,内容区预留空间防遮挡 */
+  .app-content {
+    padding-bottom: 92px;
+  }
+
+  /* 页头纵排,关键操作铺满一行并达到触控尺寸 */
+  .page-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .page-head .actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .page-head .actions > a,
+  .page-head .actions > button,
+  .page-head .actions > input {
+    flex: 1 1 auto;
+  }
+
+  .page-head .actions button {
+    min-height: 44px;
+  }
+
+  /* 表格降级为信息卡片: 隐藏表头,行变卡片,单元格纵排 */
+  .case-table thead {
+    display: none;
+  }
+
+  .case-table,
+  .case-table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .case-table tbody tr {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    background: var(--surface, #fff);
+  }
+
+  .case-table td {
+    display: block;
+    padding: 3px 0;
+    border-bottom: 0;
+    text-align: left;
+  }
+
+  /* 草稿决策按钮触控尺寸与换行 */
+  .draft-actions {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .draft-actions button {
+    min-height: 40px;
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
