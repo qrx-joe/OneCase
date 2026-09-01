@@ -50,6 +50,12 @@ function CasesView() {
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '')
 
+  // 顶栏搜索在已停留在 /cases 时只变更查询参数 (组件不重挂载),
+  // 用 effect 同步 URL q → 页内搜索框,保证两处状态一致;前进/后退同样生效
+  useEffect(() => {
+    setSearchQuery(searchParams.get('q') || '')
+  }, [searchParams])
+
   useEffect(() => {
     async function load() {
       try {
