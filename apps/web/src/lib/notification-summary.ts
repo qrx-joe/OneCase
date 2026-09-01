@@ -13,6 +13,8 @@ export interface NotificationSummary {
   inProgress: number
   /** 活跃但超过 stalledDays 天未更新 */
   stalled: number
+  /** 命中任一条件的独立事项数 (角标口径: 同一事项只计 1 次) */
+  total: number
 }
 
 /** 活跃状态 = 未关闭且未取消 (与 /api/cases 返回口径一致) */
@@ -27,12 +29,23 @@ export function summarizeNotifications(
     (acc, c) => {
       // 已终结状态不产生待办计数 (调用方 /api/cases 只返回活跃 Case,此处再防御一次)
       if (c.status === 'CLOSED' || c.status === 'CANCELED') return acc
-      if (c.status === 'OPEN') acc.open += 1
-      if (c.status === 'IN_PROGRESS') acc.inProgress += 1
+      let hit = false
+      if (c.status === 'OPEN') {
+        acc.open += 1
+        hit = true
+      }
+      if (c.status === 'IN_PROGRESS') {
+        acc.inProgress += 1
+        hit = true
+      }
       // "超过 stalledDays 天未更新" = 严格早于阈值时间点;恰好第 N 天不算
-      if (new Date(c.updatedAt).getTime() < stalledBefore) acc.stalled += 1
+      if (new Date(c.updatedAt).getTime() < stalledBefore) {
+        acc.stalled += 1
+        hit = true
+      }
+      if (hit) acc.total += 1
       return acc
     },
-    { open: 0, inProgress: 0, stalled: 0 }
+    { open: 0, inProgress: 0, stalled: 0, total: 0 }
   )
 }

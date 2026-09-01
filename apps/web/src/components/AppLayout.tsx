@@ -93,7 +93,8 @@ export function AppLayout({ children, title }: AppLayoutProps) {
         { label: '超 7 天未更新', value: summary.stalled, href: '/cases?stalled=7' },
       ].filter((row) => row.value > 0)
     : []
-  const notifTotal = notifRows.reduce((sum, row) => sum + row.value, 0)
+  // 角标 = 命中任一条件的独立事项数 (同一事项可能同时出现在多个分组,但只计 1)
+  const notifTotal = summary?.total ?? 0
 
   return (
     <div className="app-shell">

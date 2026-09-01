@@ -15,7 +15,7 @@ describe('summarizeNotifications', () => {
       ],
       { now }
     )
-    expect(summary).toEqual({ open: 2, inProgress: 1, stalled: 0 })
+    expect(summary).toEqual({ open: 2, inProgress: 1, stalled: 0, total: 3 })
   })
 
   it('超过阈值天未更新的活跃事项计入 stalled (含 WAITING)', () => {
@@ -29,11 +29,27 @@ describe('summarizeNotifications', () => {
     )
     expect(summary.stalled).toBe(2)
     expect(summary.open).toBe(1)
+    expect(summary.inProgress).toBe(1)
+    // 3 个不同事项各自命中条件 → total 3
+    expect(summary.total).toBe(3)
+  })
+
+  it('角标口径: 同一事项命中多个条件只计 1 (审查报告 P2)', () => {
+    const summary = summarizeNotifications(
+      [
+        { status: 'OPEN', updatedAt: daysAgo(10) }, // 待处理 + 停滞 → 1 个事项
+        { status: 'IN_PROGRESS', updatedAt: daysAgo(20) }, // 处理中 + 停滞 → 1 个事项
+        { status: 'RESOLVED', updatedAt: daysAgo(0) }, // 未命中任何条件
+      ],
+      { now }
+    )
+    expect(summary).toEqual({ open: 1, inProgress: 1, stalled: 2, total: 2 })
   })
 
   it('恰好第 7 天视为未停滞,自定义阈值生效', () => {
     const exactly7 = summarizeNotifications([{ status: 'OPEN', updatedAt: daysAgo(7) }], { now })
     expect(exactly7.stalled).toBe(0)
+    expect(exactly7.total).toBe(1)
 
     const custom = summarizeNotifications(
       [{ status: 'OPEN', updatedAt: daysAgo(7) }],
@@ -43,7 +59,7 @@ describe('summarizeNotifications', () => {
   })
 
   it('空列表与已终结状态不计入任何计数', () => {
-    expect(summarizeNotifications([], { now })).toEqual({ open: 0, inProgress: 0, stalled: 0 })
+    expect(summarizeNotifications([], { now })).toEqual({ open: 0, inProgress: 0, stalled: 0, total: 0 })
     const closed = summarizeNotifications(
       [
         { status: 'CLOSED', updatedAt: daysAgo(90) },
@@ -52,6 +68,6 @@ describe('summarizeNotifications', () => {
       { now }
     )
     // /api/cases 只返回活跃 Case,这里防御性验证终结态不产生待办计数
-    expect(closed).toEqual({ open: 0, inProgress: 0, stalled: 0 })
+    expect(closed).toEqual({ open: 0, inProgress: 0, stalled: 0, total: 0 })
   })
 })
