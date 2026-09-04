@@ -137,7 +137,7 @@ pnpm --filter @onecase/web build     # 构建验证
 packages/
   domain/     纯业务逻辑 (状态机/优先级/评分) — 无框架依赖
   contracts/  Zod Schemas
-  ai/         Provider 抽象 + Mock/Qwen/OpenAI + Factory
+  ai/         Provider 抽象 + Mock/Qwen/OpenAI/StepFun + Factory
   db/         Prisma Schema (SQLite) + seed + reset
 apps/web/
   src/app/
@@ -163,6 +163,7 @@ docs/
 |---|---|
 | Qwen | `AI_PROVIDER=qwen`、`QWEN_API_KEY`，并用 `QWEN_MODEL` 指定支持视觉的模型 |
 | OpenAI | `AI_PROVIDER=openai`、`OPENAI_API_KEY`，并用 `OPENAI_MODEL` 指定支持视觉的模型 |
+| StepFun (阶跃) | `AI_PROVIDER=stepfun`、`STEPFUN_API_KEY`；默认 `STEPFUN_MODEL=step-1o-turbo-vision`（视觉，已实测图片识别），纯文本可换 `step-2-16k` |
 
 本地可将配置放在不入库的 `apps/web/.env.local`，修改后重启服务。不要把密钥写进代码、邮件或参赛附件。仅当 `DEMO_MODE=true` 与 `AI_ALLOW_MOCK_FALLBACK=true` 同时启用时，配置失败才允许退回 Mock；退回后仍不能识别图片。
 
