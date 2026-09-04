@@ -23,10 +23,11 @@ export const IssueDraftSchema = z.object({
   locationText: z.string().nullable().optional(),
   impact: z.enum(['LOW', 'MEDIUM', 'HIGH', 'UNKNOWN']),
   urgency: z.enum(['LOW', 'MEDIUM', 'HIGH', 'UNKNOWN']),
-  affectedGroups: z.array(z.string()).default([]),
-  riskSignals: z.array(z.string()).default([]),
-  missingInformation: z.array(z.string()).default([]),
-  evidenceConflict: z.boolean().default(false),
+  // 提示词允许模型对未知字段返回 null;数组/布尔字段把 null 与缺失同归一化,语义不变 (空集/false)
+  affectedGroups: z.array(z.string()).nullish().transform(v => v ?? []),
+  riskSignals: z.array(z.string()).nullish().transform(v => v ?? []),
+  missingInformation: z.array(z.string()).nullish().transform(v => v ?? []),
+  evidenceConflict: z.boolean().nullish().transform(v => v ?? false),
   suggestedPriority: z.enum(['P1', 'P2', 'P3', 'UNKNOWN']).nullable().optional(),
   action: z.enum(['CREATE_CASE', 'LINK_EXISTING', 'REVIEW_NEEDED']).nullable().optional(),
 })

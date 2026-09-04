@@ -39,6 +39,22 @@ describe('IssueDraftSchema', () => {
         .success
     ).toBe(false)
   })
+
+  it('数组/布尔字段为显式 null 时归一化 (提示词允许未知字段返回 null)', () => {
+    const parsed = IssueDraftSchema.parse({
+      ...validIssue,
+      affectedGroups: null,
+      riskSignals: null,
+      missingInformation: null,
+      evidenceConflict: null,
+    })
+    expect(parsed).toMatchObject({
+      affectedGroups: [],
+      riskSignals: [],
+      missingInformation: [],
+      evidenceConflict: false,
+    })
+  })
 })
 
 describe('AnalysisResultSchema', () => {
