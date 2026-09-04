@@ -142,13 +142,7 @@ export async function POST(
       try {
         const cfg = resolveProviderConfig()
         provider = cfg.type
-        modelVersion =
-          cfg.model ||
-          (cfg.type === 'qwen'
-            ? 'qwen2.5-vl-72b-instruct'
-            : cfg.type === 'openai'
-            ? 'gpt-4o'
-            : 'mock-v1')
+        modelVersion = cfg.model
       } catch {
         provider = String(process.env.AI_PROVIDER || 'mock')
         modelVersion = 'unknown'

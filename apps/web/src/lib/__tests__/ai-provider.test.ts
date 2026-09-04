@@ -16,9 +16,28 @@ describe('resolveProviderConfig', () => {
     expect(resolveProviderConfig({}).type).toBe('mock') // 缺省 mock
   })
 
-  it('qwen/openai 缺 Key 时保留类型,由装配层决定降级或抛错', () => {
+  it('qwen/openai/stepfun 缺 Key 时保留类型,由装配层决定降级或抛错', () => {
     expect(resolveProviderConfig({ AI_PROVIDER: 'qwen' }).type).toBe('qwen')
     expect(resolveProviderConfig({ AI_PROVIDER: 'openai' }).apiKey).toBeUndefined()
+    expect(resolveProviderConfig({ AI_PROVIDER: 'stepfun' })).toMatchObject({
+      type: 'stepfun',
+      apiKey: undefined,
+      model: 'step-1o-turbo-vision',
+    })
+  })
+
+  it('stepfun 解析独立 Key/Model,不串用 OpenAI 配置', () => {
+    expect(resolveProviderConfig({
+      AI_PROVIDER: 'stepfun',
+      STEPFUN_API_KEY: 'stepfun-key',
+      STEPFUN_MODEL: 'step-1v-8k',
+      OPENAI_API_KEY: 'openai-key',
+      OPENAI_MODEL: 'gpt-4o',
+    })).toMatchObject({
+      type: 'stepfun',
+      apiKey: 'stepfun-key',
+      model: 'step-1v-8k',
+    })
   })
 
   it('Mock 降级双开关: 必须同时满足 DEMO_MODE=true 与 AI_ALLOW_MOCK_FALLBACK=true', () => {
@@ -46,11 +65,35 @@ describe('assembleProvider', () => {
   it('qwen 无 Key 且非 Demo: 抛出配置错误 (不静默降级 Mock)', () => {
     expect(() => assembleProvider({ AI_PROVIDER: 'qwen' })).toThrow(/AI Provider 配置不可用/)
     expect(() => assembleProvider({ AI_PROVIDER: 'openai' })).toThrow(/AI Provider 配置不可用/)
+    expect(() => assembleProvider({ AI_PROVIDER: 'stepfun' })).toThrow(/AI Provider 配置不可用/)
   })
 
   it('明确 Demo 双开关开启时才降级 Mock,且 actual 如实记录为 mock', () => {
     const assembled = assembleProvider(DEMO_FALLBACK_ENV)
     expect(assembled.actual).toBe('mock')
+    expect(assembled.degraded).toBe(true)
+    expect(assembled.modelVersion).toBe('mock-v1')
+  })
+
+  it('stepfun 成功装配时审计实际 provider/model', () => {
+    const assembled = assembleProvider({
+      AI_PROVIDER: 'stepfun',
+      STEPFUN_API_KEY: 'test-key',
+      STEPFUN_MODEL: 'step-1v-8k',
+    })
+    expect(assembled.actual).toBe('stepfun')
+    expect(assembled.modelVersion).toBe('step-1v-8k')
+    expect(assembled.degraded).toBe(false)
+  })
+
+  it('stepfun 配置失败只在 Demo 双开关下降级并审计 mock', () => {
+    const assembled = assembleProvider({
+      AI_PROVIDER: 'stepfun',
+      DEMO_MODE: 'true',
+      AI_ALLOW_MOCK_FALLBACK: 'true',
+    })
+    expect(assembled.actual).toBe('mock')
+    expect(assembled.modelVersion).toBe('mock-v1')
     expect(assembled.degraded).toBe(true)
   })
 })

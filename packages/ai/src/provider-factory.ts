@@ -3,8 +3,9 @@ import { ExtractionProvider } from './provider'
 import { MockProvider } from './mock-provider'
 import { QwenProvider } from './qwen-provider'
 import { OpenAIProvider } from './openai-provider'
+import { StepFunProvider } from './stepfun-provider'
 
-export type ProviderType = 'mock' | 'qwen' | 'openai'
+export type ProviderType = 'mock' | 'qwen' | 'openai' | 'stepfun'
 
 export interface ProviderConfig {
   type: ProviderType
@@ -35,6 +36,15 @@ export function createProvider(config: ProviderConfig): ExtractionProvider {
         throw new Error('OpenAI API key is required')
       }
       return new OpenAIProvider(config.apiKey, config.model ?? 'gpt-4o', {
+        timeoutMs: config.timeoutMs,
+        maxRetries: config.maxRetries,
+      })
+
+    case 'stepfun':
+      if (!config.apiKey) {
+        throw new Error('StepFun API key is required')
+      }
+      return new StepFunProvider(config.apiKey, config.model ?? 'step-1o-turbo-vision', {
         timeoutMs: config.timeoutMs,
         maxRetries: config.maxRetries,
       })
