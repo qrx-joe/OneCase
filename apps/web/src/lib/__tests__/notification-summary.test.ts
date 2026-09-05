@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { summarizeNotifications } from '../notification-summary'
+import { DEFAULT_NOTIFY_PREFS } from '../user-settings'
 
 const now = new Date('2026-09-01T12:00:00Z')
 const daysAgo = (n: number) => new Date(now.getTime() - n * 24 * 60 * 60 * 1000).toISOString()
@@ -69,5 +70,58 @@ describe('summarizeNotifications', () => {
     )
     // /api/cases 只返回活跃 Case,这里防御性验证终结态不产生待办计数
     expect(closed).toEqual({ open: 0, inProgress: 0, stalled: 0, total: 0 })
+  })
+
+  it('notify 全开与不传等价 (默认全开)', () => {
+    const cases = [
+      { status: 'OPEN', updatedAt: daysAgo(8) },
+      { status: 'IN_PROGRESS', updatedAt: daysAgo(9) },
+    ]
+    expect(summarizeNotifications(cases, { now, notify: DEFAULT_NOTIFY_PREFS })).toEqual(
+      summarizeNotifications(cases, { now })
+    )
+  })
+
+  it('关闭某类提醒后对应计数与角标贡献一并归零', () => {
+    const cases = [
+      { status: 'OPEN', updatedAt: daysAgo(0) },
+      { status: 'IN_PROGRESS', updatedAt: daysAgo(1) },
+      { status: 'WAITING', updatedAt: daysAgo(30) },
+    ]
+    const noPending = summarizeNotifications(cases, {
+      now,
+      notify: { ...DEFAULT_NOTIFY_PREFS, pendingReminders: false },
+    })
+    expect(noPending.open).toBe(0)
+    expect(noPending.inProgress).toBe(1)
+    // WAITING 超 7 天只由 overdue 条件命中,不受 pending 关闭影响
+    expect(noPending.stalled).toBe(1)
+    expect(noPending.total).toBe(2)
+
+    const noOverdue = summarizeNotifications(cases, {
+      now,
+      notify: { ...DEFAULT_NOTIFY_PREFS, overdueReminders: false },
+    })
+    expect(noOverdue.stalled).toBe(0)
+    // OPEN 事项仍由 pending 条件命中
+    expect(noOverdue.open).toBe(1)
+    expect(noOverdue.total).toBe(2)
+  })
+
+  it('同一事项同时命中已关闭与已开启的条件时,只按开启条件计入角标', () => {
+    // OPEN 且超 7 天: 关闭 overdue 后仍命中 pending → total 1;两项都关 → total 0
+    const both = [{ status: 'OPEN', updatedAt: daysAgo(10) }]
+    expect(
+      summarizeNotifications(both, {
+        now,
+        notify: { ...DEFAULT_NOTIFY_PREFS, overdueReminders: false },
+      }).total
+    ).toBe(1)
+    expect(
+      summarizeNotifications(both, {
+        now,
+        notify: { pendingReminders: false, overdueReminders: false, progressDigest: false },
+      })
+    ).toEqual({ open: 0, inProgress: 0, stalled: 0, total: 0 })
   })
 })

@@ -8,15 +8,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { AppLayout } from '@/components/AppLayout'
 import { Button } from '@/components'
 import { IntakeSource } from '@/components/IntakeSource'
-
-const CATEGORY_OPTIONS = [
-  { code: '', label: '未分类' },
-  { code: 'PUBLIC_FACILITIES', label: '公共设施' },
-  { code: 'ENVIRONMENT', label: '环境卫生' },
-  { code: 'NOISE', label: '噪音邻里' },
-  { code: 'SAFETY', label: '安全隐患' },
-  { code: 'PARKING', label: '停车管理' },
-]
+import { CATEGORY_SELECT_OPTIONS } from '@/lib/category-labels'
 
 const PRIORITY_OPTIONS = ['P1', 'P2', 'P3', 'UNKNOWN']
 
@@ -123,7 +115,7 @@ function ManualCaseForm() {
                   value={categoryCode}
                   onChange={(e) => setCategoryCode(e.target.value)}
                 >
-                  {CATEGORY_OPTIONS.map((opt) => (
+                  {CATEGORY_SELECT_OPTIONS.map((opt) => (
                     <option key={opt.code} value={opt.code}>
                       {opt.label}
                     </option>

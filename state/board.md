@@ -3,6 +3,13 @@
 > 用法：**倒序追加**，每轮一段。只记会影响后续行动的事：① 完成了什么 ② 作了什么决定、理由 ③ 下一步从哪接。
 > 给人看的版本在 `docs/devlog/`（按日期命名）。内容冲突时以代码与 adr 为准（权重见 CLAUDE.md「真相源权重」）。
 
+## 2026-09-06 · 凌晨 2 · 演示虚拟登录 + 设置页落地（本人拍板「加完整性」，全量验证绿）
+
+- 完成：① `/login` 演示虚拟登录页——内置演示凭据 `onecase / onecase2026`（单一来源 `lib/demo-auth.ts`，页脚有备忘小字），仅写 localStorage 本机会话，**无后端鉴权、不拦 API**（API 级脚本/彩排零影响）；AppLayout 加前端门卫（无会话跳 /login），退出登录在设置页。② `/settings` 设置页——真实项：账号资料（读会话）、通知偏好三开关（localStorage 持久化，经 `summarizeNotifications` 新增 notify 选项**真实作用于顶栏铃铛分组与角标**，全关时铃铛空态有专门文案）、AI 识别配置只读（复用 /api/intakes/capabilities，Mock 环境如实显示「Mock 演示模式」，不展示密钥）、分类字典只读；未实现项统一 Badge「敬请期待」（修改密码/页面内切换模型/组织权限/SLA/集成/导入导出/审计/品牌）+「规划中」占位卡，不冒充可用。③ 字典单一来源：`CATEGORY_LABELS` 原在今日工作/全部事项/详情三页重复定义、手动建案另有 `CATEGORY_OPTIONS`，统一提取 `lib/category-labels.ts`（含下拉用 `CATEGORY_SELECT_OPTIONS`），四个页面全部改接。④ 侧栏恢复预留的「管理」区放设置入口，用户卡可点进设置。
+- 决定：门卫只做前端跳转（本人明确此为演示完整性需求而非安全需求，勿在其上叠真实权限）；E2E 用 Playwright 标准 setup 项目——`tests/e2e/auth.setup.ts` 真实走 /login 存 storageState，chromium 项目全局复用（状态目录已 gitignore；setup 项目须与 chromium 同配 `channel` 否则回退找未安装的 headless shell 报错）；README/E2E 数字与 07 运行手册登录提示本轮不改——对外口径归人，且凌晨段刚刷过材料。
+- 验证：typecheck 干净；单测 domain 33 / contracts 25 / ai 74 / **web 81**（新增 demo-auth 6、user-settings 4、通知过滤 3）全绿；Playwright E2E 本轮实测 **32 用例全过**（新增 settings.spec 2 条，全部既有用例带门卫通过；凌晨段记录 29，口径差 1 条未对齐，留材料轮核）；`next build` 成功（/login、/settings 静态预渲染）。**注意：凌晨段刷入材料的数字（200 单测/29 E2E）因本轮落地再次过时**，全仓现为 213 单测 / 32 E2E，材料轮需再刷。
+- 下一步从哪接：① 本人在 07 运行手册加一行 T-5「先登录演示账号」（凭据在登录页页脚也有，防忘词）；② 材料数字刷新（213/32）与 README 验证基线段同步；③ 既有 backlog 候选不变（Review 页 evidenceConflict 渲染）。
+
 ## 2026-09-06 · 凌晨 · 材料数字刷至当日实测 + 两会话工作分批提交
 
 - 完成：基于晚7回修后的代码全量复跑——**单测 200（domain 33 / contracts 25 / ai 74 / web 68）、业务不变量 99/99（含 §8 新六项）、Playwright E2E 29/29（隔离环境，新增 conflict-flag）**，typecheck 干净。比赛材料数字整体从 09-05 口径（196/93/28）刷至 09-06 口径（200/99/29）：PPT 第 9 页（74/68/200、注记改 09-06）、02-v2、06/07/08、preliminary README、01、根 README；PDF 重导、P9 judge 复验通过，三份二进制再次覆盖 `初赛提交附件-v2/`。

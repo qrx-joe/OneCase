@@ -7,6 +7,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { AppLayout } from '@/components/AppLayout'
 import { Button, Badge } from '@/components'
+import { CATEGORY_LABELS } from '@/lib/category-labels'
 
 interface SourceDetail {
   id: string
@@ -56,14 +57,6 @@ const STATUS_LABELS: Record<string, { label: string; variant: 'blue' | 'orange' 
   RESOLVED: { label: '已解决', variant: 'green' },
   CLOSED: { label: '已关闭', variant: 'gray' },
   CANCELED: { label: '已取消', variant: 'gray' },
-}
-
-const CATEGORY_LABELS: Record<string, string> = {
-  PUBLIC_FACILITIES: '公共设施',
-  ENVIRONMENT: '环境卫生',
-  NOISE: '噪音邻里',
-  SAFETY: '安全隐患',
-  PARKING: '停车管理',
 }
 
 export default function CaseDetailPage() {

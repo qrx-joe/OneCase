@@ -24,9 +24,22 @@ export default defineConfig({
   },
   projects: [
     {
-      name: 'chromium',
-      // channel chromium = 新 headless 模式,复用已安装的完整 chromium,无需单独的 headless shell
+      // 演示虚拟登录门卫 (AppLayout) 需要 storageState: setup 项目先走一遍
+      // /login 写入本机会话,chromium 项目复用;状态文件已 gitignore
+      name: 'setup',
+      testMatch: /auth\.setup\.ts/,
+      // 与 chromium 项目同源: 本机只装了完整 chromium (channel),无 headless shell
       use: { ...devices['Desktop Chrome'], channel: 'chromium' },
+    },
+    {
+      name: 'chromium',
+      dependencies: ['setup'],
+      // channel chromium = 新 headless 模式,复用已安装的完整 chromium,无需单独的 headless shell
+      use: {
+        ...devices['Desktop Chrome'],
+        channel: 'chromium',
+        storageState: 'tests/e2e/.auth/state.json',
+      },
     },
   ],
   webServer: {
