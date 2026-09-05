@@ -2,7 +2,7 @@
 
 **版本**: v0.1 MVP
 **状态**: 文字与图片链路可演示；StepFun 已真实跑通至 Review，识别质量与异常收尾仍待验收
-**更新**: 2026-09-05
+**更新**: 2026-09-06
 
 ---
 
@@ -34,7 +34,9 @@ AI Draft != Business Fact
 
 | 功能                                   | 当前情况                                                                                                                       |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| 文字整理、草稿编辑、人工确认与事项跟踪 | 已实现，保留原有文字流程                                                                                                       |
+| 演示虚拟登录                           | 固定演示凭据（`onecase / onecase2026`，前端本机会话），打开任意页面先跳登录页；**无后端鉴权**，生产认证在试点前置清单最前                                                    |
+| 设置页                                 | 账号资料（读真实会话）、通知偏好（真实控制顶栏铃铛，本机持久化）、AI 识别配置（只读展示实际 Provider/模型，不展示密钥）、分类字典；未实现项统一标「敬请期待」，不冒充可用         |
+| 文字整理、草稿编辑、人工确认与事项跟踪 | 已实现，保留原有文字流程                                                                                                                       |
 | 业务术语中文化                         | 界面统一为"居民来件/新建事项/关联此事项/等待物业/街道"；API 路径与内部字段名保持英文不变                                       |
 | 手机端关键路径                         | ≤768px 底部 Tab 导航、表格卡片化、触控尺寸；已有 375×812 移动黄金链路 E2E，真机/微信内嵌浏览器尚未验证                         |
 | 顶栏搜索与通知                         | 搜索回车跳转事项页并带入关键词；通知铃铛显示待处理/处理中/超 7 天未更新（真实统计）                                            |
@@ -130,6 +132,8 @@ pnpm --filter @onecase/web build     # 构建验证
 
 2026-09-05 StepFun 接入后复跑：AI **55/55**、Web **36/36**、Contracts **25/25** 单元测试，AI build 与 Web typecheck 通过；独立临时 SQLite、强制 Mock 的业务不变量 **93/93**。未直接运行整套 Playwright E2E，因为当前配置会重置正在使用的数据库并可能复用真实 StepFun 服务。完整审查见 [StepFun 接入闭环审查](docs/review/StepFun接入闭环审查-2026-09-05.md)。
 
+2026-09-06 深夜全量复跑：单测 **213**（domain 33 / contracts 25 / ai 74 / web 81）、业务不变量 **99/99**、Playwright E2E **32/32**（含演示登录 setup 与设置页用例）、web typecheck 与 `next build` 通过。新增演示虚拟登录（`/login` + 前端会话门卫）与设置页（`/settings`），类别文案字典提取为 `lib/category-labels.ts` 单一来源；UI 全功能走查 24/24 通过（真实 StepFun 运行态，脚本 `apps/web/scripts/walkthrough-ui.mjs`）。
+
 **CI**: GitHub Actions (`.github/workflows/ci.yml`) 在每次 push/PR 上自动跑 typecheck、单测（含 20 条合成 Eval）、全仓 build 与 Playwright E2E。
 
 **Eval**: `packages/ai/__tests__/eval.test.ts` 仅对 Mock 基线跑 20 条合成用例（100% 通过 = 可执行规格），指定真实 Provider 会报错。真实 StepFun 评估使用独立的 20 条文字、10 张合成图片事实样本：`pnpm --filter @onecase/web eval:quality` 默认只生成样本、不调用模型；获准后显式指定 `--run` 与请求上限，见 [真实模型评估说明](docs/testing/real-model-quality.md)。
@@ -189,14 +193,13 @@ docs/
 
 ## 已知限制 (试点前需补)
 
-- 认证/RBAC/租户硬隔离未实现 (organizationId 仅过滤,未校验归属)
+- 后端鉴权未实现：当前仅有**演示虚拟登录**（固定账号、纯前端本机会话，无权限校验）；真实认证/RBAC/租户硬隔离在试点前置清单最前
 - Case 编号 `count()+1` 并发可重号 → 改序列
 - Embedding 重复检测未接 (当前为标题/地点/类别启发式)
 - 图片识别仍需代表性样本、准确率、稳定性和现场失败演练；语音录音和转写尚未接入
 - 图片目前以 data URL 存入 SQLite，仅适合小规模演示；生产存储与权限仍需设计
 - AI 成功后若最终数据库事务失败，Intake 可能暂留 `ANALYZING`，当前需等待 10 分钟超时后接管
 - Playwright E2E 已隔离专用数据库、3100 端口、构建缓存与 Mock Provider；旧 API 测试脚本不受该隔离配置保护
-- Review 页尚未显示实际 provider/model；图片能力接口也尚未严格区分视觉与纯文本模型
 - SQLite → PostgreSQL 迁移
 - webpack 缓存损坏: 改 lib 文件后热重载可能 500,重启 `pnpm dev` 即恢复;`next build` 与运行中的 dev server 共写 `.next`,build 后建议重启 dev
 

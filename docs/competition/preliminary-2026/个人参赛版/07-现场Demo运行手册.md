@@ -2,7 +2,7 @@
 
 服务对象：[06-现场展示脚本-20分钟](06-现场展示脚本-20分钟.md) §2.4 的 Demo 段。目标：**任何一步失败都有下一步，不冷场、不编造、不粉饰。**
 
-本文运行态基线为 2026-09-05 现场冒烟实测：dev server :3000，`/api/intakes/capabilities` 返回 `stepfun / step-1o-turbo-vision`（`imageModelSupported: true`），Dashboard KPI 待处理 2 / 处理中 3 / 高优先级 3（seed 基线），CASE-018 状态 `IN_PROGRESS`（可直接转"已解决"）。`apps/web/.env.local` 为 `AI_PROVIDER=stepfun`，**未配置 DEMO_MODE / AI_ALLOW_MOCK_FALLBACK 双开关，AI 失败会如实报错、不静默降级**。
+本文运行态基线为 2026-09-06 凌晨实测：dev server :3000，`/api/intakes/capabilities` 返回 `stepfun / step-1o-turbo-vision`（`imageModelSupported: true`），Dashboard KPI 待处理 2 / 处理中 3 / 高优先级 3（seed 基线），CASE-018 状态 `IN_PROGRESS`（可直接转"已解决"）。`apps/web/.env.local` 为 `AI_PROVIDER=stepfun`，**未配置 DEMO_MODE / AI_ALLOW_MOCK_FALLBACK 双开关，AI 失败会如实报错、不静默降级**。系统当前带演示虚拟登录（账号 `onecase` / 密码 `onecase2026`，见 `apps/web/src/lib/demo-auth.ts`；登录页页脚有小字备忘）。
 
 纪律：演示只用合成数据；不在演示机写入任何真实居民信息；不把 Mock 说成真实模型；不把候选分数说成重复概率；不声称注入防护。
 
@@ -24,7 +24,7 @@
   curl http://localhost:3000/api/dashboard
   ```
 - [ ] **合成图片预检（1 次真实调用，属冒烟范围）**：选一张合成反馈图片走完 上传 → 整理 → Review；记录结果与耗时。失败则现场只展示"上传/保存/刷新恢复/转人工"。
-- [ ] 录制备份视频两段（黄金链路、图片链路），文件名注明日期、Provider、合成数据；拷 U 盘 + 云端。
+- [ ] 备份视频已就绪：`docs/demo/video/OneCase-备份演示视频.mp4`（3.8 分钟，配音+字幕，覆盖登录/文字链路/图片链路/兜底/设置/落地）。如代码有改动需重录：`pnpm --filter @onecase/db db:reset` 后执行 `node apps/web/scripts/record-demo-video.mjs` + `python docs/demo/video/compose.py`。
 - [ ] 截两张当日预检截图备用（Review 页、Case 详情页）。
 - [ ] 外接屏 / HDMI / 转接头试一次；关闭系统通知；电源计划设为"演示时不休眠"。
 - [ ] 打印本手册与 06 脚本；演示文本存入演示机本地文本文件（防剪贴板丢失）。
@@ -33,14 +33,15 @@
 
 - [ ] dev server 存活，`/api/intakes/capabilities` 返回的 provider/model **抄在讲稿首页**（开场要明示）。
 - [ ] `/api/dashboard` KPI = 待处理 2 / 处理中 3 / 高优先级 3；不符则评估是否 `db:reset`（需预留 2 分钟）。
+- [ ] **浏览器用干净 Profile（无痕窗口亦可）**：MetaMask 等钱包扩展会向页面注入脚本并抛错，被 Next 开发弹窗当成应用错误弹出（已实测踩坑）。若页面打开后**无样式、点击无反应**，多为 `.next` 构建缓存与 build/dev 冲突——重启 `pnpm --filter @onecase/web dev` 即恢复。
 - [ ] 手工点一遍：`/cases/CASE-018` 能打开、状态下拉含"→ 已解决"。
-- [ ] 演示文本进剪贴板；浏览器单窗口、隐藏书签栏、缩放 100%、无痕模式。
+- [ ] 演示文本进剪贴板；浏览器单窗口、隐藏书签栏、缩放 100%。
 - [ ] 合成图片文件放桌面；关闭其他可能弹通知/更新的应用。
 - [ ] **演示当天不要跑 Playwright E2E、不要跑 `next build`**（共写 `.next` 有缓存损坏风险，见意外矩阵）。
 
 ### T-5 分钟
 
-- [ ] 首页 Dashboard 停留为开场画面。
+- [ ] **先登录演示账号**（`onecase / onecase2026`），停在首页 Dashboard 作为开场画面；提前试一次登出→登录，确认顺手。
 - [ ] 开场第一句说清 Provider 与合成数据，之后不再重复。
 
 ---
@@ -69,6 +70,7 @@
 
 | # | 操作 | 预期 | 话术落点 |
 |---|---|---|---|
+| 0 | 登录（T-5 已完成则跳过） | 输入演示账号进入工作台 | "演示环境用固定账号登录，正式部署会换真实认证。" |
 | 1 | 首页停留 | KPI 2/3/3，页面标注"Demo 数据 · 仅统计已确认事项，不含 AI 草稿" | "首页数字只统计已确认事项——AI 草稿不进统计。" |
 | 2 | 点"＋ 居民来件" | 进入输入页 | — |
 | 3 | 粘贴主留言 | 原文完整呈现 | "不做任何预处理，直接原文进来。" |
@@ -135,7 +137,7 @@
 5. 不把演示库统计说成"社区使用成绩"。
 6. 不操作语音入口（已禁用）；不承诺微信接入时间表。
 7. 不现场演示 `db:reset` 作为节目环节，更不对非演示库执行。
-8. 说"测试 200 项"必须带日期口径（2026-09-06 复跑），不说"永远通过"。
+8. 说"测试 213 项"必须带日期口径（2026-09-06 复跑；PPT P9 提交版快照仍为 200，答辩口播以最新实测为准并说明材料定格后代码仍在演进），不说"永远通过"。
 9. 屏幕与讲稿不出现姓名、电话（报名资料已含）。
 10. "下一步会做"的承诺收窄到 06 脚本 §2.6 已列范围，不现场加码。
 

@@ -1,7 +1,8 @@
 # OneCase 90 秒演示脚本
 
 **目标**: 展示核心差异化 — `1 Intake → 2 Issues` + `多 Intake → 1 Case`
-**前提**: Dev Server 运行在 :3000，使用合成数据。下文固定候选与数字来自旧 seed，须以当前页面为准；仅在独立、可清空的演示库中执行 `db:reset`，不要重置正在使用的数据。
+**前提**: Dev Server 运行在 :3000，使用合成数据；系统带演示虚拟登录（打开任意页面会先跳 `/login`，账号 `onecase` / 密码 `onecase2026`）。下文固定候选与数字来自旧 seed，须以当前页面为准；仅在独立、可清空的演示库中执行 `db:reset`，不要重置正在使用的数据。
+**兜底**: 完整备份视频（配音+字幕）在 `docs/demo/video/OneCase-备份演示视频.mp4`；现场浏览器务必用干净 Profile（无 MetaMask 等钱包扩展——它们会向页面注入脚本报错弹窗）。
 
 > **比赛现场展示**（20 分钟 3+15+2）的赛前清单、Demo 分镜与故障预案，见 [现场Demo运行手册](../competition/preliminary-2026/个人参赛版/07-现场Demo运行手册.md)；本篇是 90 秒速通版。
 
@@ -120,8 +121,9 @@
 
 - [ ] 确认使用独立、可清空的演示数据库后，再运行 `pnpm --filter @onecase/db db:reset`
 - [ ] Dev Server 启动,首页 KPI: 2/3/3
-- [ ] `/api/intakes/capabilities` 显示预期 provider/model；注意“非 Mock”不自动证明模型支持视觉
+- [ ] `/api/intakes/capabilities` 显示预期 provider/model；注意"非 Mock"不自动证明模型支持视觉
+- [ ] 先登录演示账号（`onecase / onecase2026`）；浏览器 Profile 干净，无钱包类扩展
 - [ ] 演示文本已复制到剪贴板
 - [ ] CASE-018 详情可打开
 - [ ] 用合成图片做一次现场预检；失败则只展示上传、恢复和转人工
-- [ ] 演示当天不跑 Playwright E2E、不跑 `next build`：E2E 已隔离（3100 端口 / e2e-demo.db / 强制 Mock，28/28 通过），但没必要在演示机引入端口与构建缓存风险
+- [ ] 演示当天不跑 Playwright E2E、不跑 `next build`：E2E 已隔离（3100 端口 / e2e-demo.db / 强制 Mock，32/32 通过），但没必要在演示机引入端口与构建缓存风险
