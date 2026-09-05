@@ -47,17 +47,62 @@ def split_lines(text, max_len=22):
     return lines
 
 
+_PUNCT = set("，。：；！？、（）()《》<>\"\"''\"'…—·,.:;!? \t\n")
+
+
 def make_srt(seg_id, narration, audio_dur):
     lines = split_lines(narration)
-    total_chars = sum(len(l) for l in lines)
+    bounds_file = ROOT / f"tmp/video/voice/{seg_id}.bounds.json"
+    fmt = lambda s: f"{int(s//3600):02d}:{int(s%3600//60):02d}:{int(s%60):02d},{int(s%1*1000):03d}"
+
+    # 优先用 edge-tts 词级时间戳对齐(字幕起止贴合真实发音),无时间戳时回退按字数比例
+    entries = None
+    if bounds_file.exists():
+        bounds = json.loads(bounds_file.read_text(encoding="utf-8"))
+        strip = lambda s: "".join(ch for ch in s if ch not in _PUNCT)
+        # 顺序消费对齐: 词序列即原文去标点后的顺序切分,逐字消费满一行即换行,
+        # 无比例缩放误差;若词流提前耗尽(个别字符被 TTS 吞掉),剩余行均分残余时间
+        if bounds and sum(len(strip(l)) for l in lines) > 0:
+            entries = []
+            wi, last_end = 0, 0.0
+            total_lines = len(lines)
+            for li, line in enumerate(lines):
+                n = len(strip(line))
+                start = max(0.0, bounds[wi][0] - 0.1) if wi < len(bounds) else last_end
+                consumed = 0
+                while consumed < n and wi < len(bounds):
+                    consumed += len(strip(bounds[wi][2]))
+                    last_end = bounds[wi][1]
+                    wi += 1
+                end = last_end + 0.15
+                if entries and start < entries[-1][1]:
+                    start = entries[-1][1]
+                if end <= start + 0.4:
+                    end = start + 0.6
+                if li == total_lines - 1 and wi >= len(bounds):
+                    end = audio_dur + 0.2
+                entries.append([start, min(end, audio_dur + 0.25), line])
+            # 词流耗尽但行未分完: 剩余行均分残余时间
+            if wi >= len(bounds) and len(entries) < total_lines:
+                remaining = [l for l in lines[len(entries):]]
+                span = max(0.6, (audio_dur - last_end) / max(1, len(remaining)))
+                for j, line in enumerate(remaining):
+                    start = last_end + j * span
+                    entries.append([start, min(start + span, audio_dur + 0.25), line])
+
+    if entries is None:
+        total_chars = sum(len(l) for l in lines)
+        entries = []
+        t = 0.25
+        for line in lines:
+            span = audio_dur * (len(line) / total_chars)
+            start, end = t, min(t + span, audio_dur + 0.2)
+            entries.append([start, end, line])
+            t = end
+
     srt = []
-    t = 0.25  # 起播提前一点
-    for i, line in enumerate(lines, 1):
-        span = audio_dur * (len(line) / total_chars)
-        start, end = t, min(t + span, audio_dur + 0.2)
-        fmt = lambda s: f"{int(s//3600):02d}:{int(s%3600//60):02d}:{int(s%60):02d},{int(s%1*1000):03d}"
+    for i, (start, end, line) in enumerate(entries, 1):
         srt.append(f"{i}\n{fmt(start)} --> {fmt(end)}\n{line}\n")
-        t = end
     srt_file = WORK / f"{seg_id}.srt"
     srt_file.write_text("\n".join(srt), encoding="utf-8")
     return srt_file
