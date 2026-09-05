@@ -4,7 +4,9 @@
 
 - [x] Playwright 浏览器 (chromium-1234,与 @playwright/test 1.62.x 匹配)
 - [x] `channel: 'chromium'` 新 headless 模式,无需单独下载 headless shell
-- [x] 端口 3000 (已有 dev server 时直接复用,否则自动启动)
+- 端口 3100 必须空闲；已有服务不会被复用。
+- 独立数据库 `packages/db/prisma/e2e-demo.db`，独立缓存 `.next-e2e` 和 TypeScript 配置。
+- 默认强制 Mock；真实模型密钥以空值覆盖，禁用配置降级开关。
 
 ## 测试场景
 
@@ -29,15 +31,28 @@ TASK.md Phase 2 验收路径,真实断言,任何一步失败即测试失败:
 
 ```bash
 pnpm --filter @onecase/web test:e2e                        # Playwright UI 链路
-node apps/web/scripts/test-golden-path.mjs                 # API 级 (先 db:reset)
-pnpm --filter @onecase/db db:reset                         # 演示前重置数据
+node apps/web/scripts/test-golden-path.mjs                 # 旧 API 脚本；不受上述 E2E 隔离控制
 ```
 
 ## 确定性
 
-- `global-setup.ts` 在每次 Playwright 运行前自动执行 `db:reset`,
+- 每个 spec 的 `beforeAll` 调用 `reset.ts`，只允许固定测试库 URL，先建表再重置，
   保证候选排序、来源计数等断言可重复。
-- node 脚本不自动 reset,需手动先跑 `pnpm --filter @onecase/db db:reset`。
+- 不要对当前演示库运行旧脚本的重置步骤。
+
+## 服务端配置失败的兜底验证
+
+PowerShell：
+
+```powershell
+$env:E2E_PROVIDER_FAILURE='true'
+pnpm.cmd --filter @onecase/web test:e2e ai-fallback.spec.ts
+Remove-Item Env:E2E_PROVIDER_FAILURE
+```
+
+启动器固定使用缺 Key 的 OpenAI 配置，不产生模型调用。预期 3 项通过、2 项跳过（缺 Key 不能恢复分析成功）；常规 28 项 E2E 中包含恢复分析成功的用例。
+
+2026-09-05 本轮验证：常规 28/28 通过，配置失败模式 3 通过、2 跳过。演示 `dev.db` SHA256 前后一致。结果不等于真实模型质量验收。
 
 ## 已知问题
 

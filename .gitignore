@@ -1,5 +1,7 @@
 node_modules
 .next
+.next-e2e
+.tsconfig.e2e.json
 out
 dist
 *.log
@@ -11,6 +13,7 @@ coverage
 .vercel
 *.tsbuildinfo
 packages/db/prisma/dev.db
+packages/db/prisma/e2e-demo.db
 packages/db/prisma/*.db-journal
 # Playwright 运行产物
 apps/web/test-results
