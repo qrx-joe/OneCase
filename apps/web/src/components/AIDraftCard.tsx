@@ -63,6 +63,15 @@ export function AIDraftCard({
           </div>
         )}
 
+        {issue.evidenceConflict && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-2.5">
+            <label className="text-xs text-red-700 font-semibold">⚠ 信息冲突</label>
+            <p className="text-xs text-red-600 mt-1">
+              AI 检测到文字与图片/前后文之间存在矛盾,地点等字段请人工核对后再确认,以核对结果为准。
+            </p>
+          </div>
+        )}
+
         {issue.missingInformation.length > 0 && (
           <div className="bg-orange-50 border border-orange-200 rounded-lg p-2.5">
             <label className="text-xs text-orange-700 font-semibold">缺失信息</label>

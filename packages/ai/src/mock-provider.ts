@@ -76,6 +76,25 @@ const MOCK_SCENARIOS: Record<string, ExtractionResult> = {
     ],
     processingNotes: '识别到 1 个事项 (不同地点)',
   },
+
+  // 场景 4: 图文/前后文冲突 (演示 Review 页冲突提示,evidenceConflict 走真实字段)
+  conflict: {
+    issues: [
+      {
+        title: '路灯损坏(地点待核对)',
+        summary: '居民反馈路灯损坏,但文字与图片所述地点不一致,需要人工核对实际位置。',
+        categoryCode: 'PUBLIC_FACILITIES',
+        impact: 'MEDIUM',
+        urgency: 'MEDIUM',
+        affectedGroups: [],
+        riskSignals: ['夜间行走风险'],
+        missingInformation: ['实际位置(文字与图片矛盾)'],
+        evidenceConflict: true,
+        suggestedPriority: 'P2',
+      },
+    ],
+    processingNotes: '识别到 1 个事项,检测到信息冲突',
+  },
 }
 
 export class MockProvider implements ExtractionProvider {
@@ -88,6 +107,9 @@ export class MockProvider implements ExtractionProvider {
 
     // 根据关键词选择场景
     const text = input.rawText.toLowerCase()
+    if (text.includes('冲突')) {
+      return MOCK_SCENARIOS.conflict
+    }
     if (text.includes('灯') && text.includes('垃圾')) {
       return MOCK_SCENARIOS['multi-issue']
     }

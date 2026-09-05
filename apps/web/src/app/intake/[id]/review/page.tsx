@@ -494,6 +494,13 @@ export default function IntakeReviewPage() {
                     )}
                   </div>
 
+                  {issue.evidenceConflict && (
+                    <div className="missing" style={{ background: 'var(--oc-red-soft)', color: '#8B1A12', border: '1px solid var(--oc-red)' }}>
+                      <strong style={{ display: 'block', marginBottom: 4 }}>⚠ 信息冲突：</strong>
+                      AI 检测到文字与图片/前后文之间存在矛盾，地点等字段请人工核对后再确认，以核对结果为准。
+                    </div>
+                  )}
+
                   {issue.missingInformation?.length > 0 && (
                     <div className="missing">
                       <strong style={{ display: 'block', marginBottom: 4 }}>缺失信息：</strong>
