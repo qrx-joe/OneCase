@@ -1,37 +1,22 @@
-// 合成 Eval 套件 (TASK.md Phase 3 验收: ≥20 条 + 记录模型/Prompt/Schema 版本)
-// 默认对 MockProvider 运行 (期望 100% 通过 = 可执行规格);
-// 设置 EVAL_PROVIDER=qwen + QWEN_API_KEY 后对真实 Provider 运行,
-// 得分即度量其相对基线的偏差 (eval 只报告,不因真实 Provider 得分低而 fail)。
+// Mock 关键词路由的可执行规格,不是模型质量评估。
+// 真实模型入口: apps/web/scripts/evaluate-model.mts (独立事实样本)。
 import { describe, it, expect } from 'vitest'
 import { AnalysisResultSchema } from '@onecase/contracts'
-import { MockProvider, QwenProvider } from '../src'
-import type { ExtractionProvider } from '../src/provider'
+import { MockProvider } from '../src'
 import { EVAL_CASES } from './eval-cases'
 
-const USE_REAL = process.env.EVAL_PROVIDER === 'qwen' && !!process.env.QWEN_API_KEY
-
-// 版本记录 (TASK.md: 记录模型/Prompt/Schema 版本)
-const VERSIONS = USE_REAL
-  ? {
-      provider: 'qwen',
-      model: process.env.QWEN_MODEL || 'qwen2.5-vl-72b-instruct',
-      promptVersion: 'openai-compatible-system-v1',
-      schemaVersion: 'contracts/AnalysisResultSchema v1',
-    }
-  : {
-      provider: 'mock',
-      model: 'mock-v1 (keyword-router: 灯+垃圾→2 issues / 电梯→5栋 / 1单元→hard-negative)',
-      promptVersion: 'n/a (keyword router)',
-      schemaVersion: 'contracts/AnalysisResultSchema v1',
-    }
-
-function pickProvider(): ExtractionProvider {
-  if (USE_REAL) return new QwenProvider(process.env.QWEN_API_KEY!, process.env.QWEN_MODEL)
-  return new MockProvider()
+// 此文件期望值耦合 Mock 路由,不能用于真实质量验收。
+if (process.env.EVAL_PROVIDER && process.env.EVAL_PROVIDER.trim().toLowerCase() !== 'mock') {
+  throw new Error('旧 Eval 仅用于 Mock 回归。真实模型请运行 pnpm --filter @onecase/web eval:quality；先预检样本,获准后显式 --run。')
+}
+const SAMPLE_VERSION = 'eval-cases-v1 (Mock 关键词路由规格)'
+const VERSIONS = {
+  provider: 'mock', model: 'mock-v1', promptVersion: 'n/a (keyword router)',
+  schemaVersion: 'contracts/AnalysisResultSchema v1',
 }
 
 describe(`合成 Eval (${EVAL_CASES.length} 条) — ${VERSIONS.provider}/${VERSIONS.model}`, () => {
-  const provider = pickProvider()
+  const provider = new MockProvider()
   const failures: string[] = []
   let passed = 0
 
@@ -78,17 +63,11 @@ describe(`合成 Eval (${EVAL_CASES.length} 条) — ${VERSIONS.provider}/${VERS
   })
 
   it('Eval 总结: 通过率与版本记录', () => {
+    const passRate = passed / EVAL_CASES.length
     console.log(
-      `[eval] provider=${VERSIONS.provider} model=${VERSIONS.model} prompt=${VERSIONS.promptVersion} schema=${VERSIONS.schemaVersion} 通过 ${passed}/${EVAL_CASES.length}`
+      `[eval] provider=${VERSIONS.provider} model=${VERSIONS.model} prompt=${VERSIONS.promptVersion} schema=${VERSIONS.schemaVersion} 样本=${SAMPLE_VERSION} 通过 ${passed}/${EVAL_CASES.length} (${(passRate * 100).toFixed(0)}%)`
     )
-    if (USE_REAL) {
-      // 真实 Provider: 报告偏差,不硬性 fail (模型行为允许偏离关键词基线)
-      console.log(`[eval] 未通过用例:\n${failures.join('\n') || '(无)'}`)
-      expect(passed).toBeGreaterThanOrEqual(0)
-    } else {
-      // Mock 基线: 期望必须 100% 满足,任何偏离都视为回归
-      expect(failures).toEqual([])
-      expect(passed).toBe(EVAL_CASES.length)
-    }
+    expect(failures).toEqual([])
+    expect(passed).toBe(EVAL_CASES.length)
   })
 })
