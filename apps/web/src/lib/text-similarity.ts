@@ -75,6 +75,19 @@ export function extractLocationNumbers(loc: string): string[] {
   return normalizeNumerals(loc).match(/\d+/g) || []
 }
 
+/**
+ * 楼栋/单元号完全一致 (数字序列逐位相等,双方都有数字):
+ * "三号楼2单元" 与 "3栋2单元" → [3,2] === [3,2] → true
+ * "3栋" 与 "3栋2单元" → [3] vs [3,2] 长度不同 → false (前缀一致走 buildingUnitMatch,不给满分补偿)
+ * 用于同位异写的地点分补偿: 措辞不同但楼栋单元号一致,视为地点相近而非无关地点。
+ */
+export function locationNumbersEqual(loc1: string, loc2: string): boolean {
+  const nums1 = extractLocationNumbers(loc1)
+  const nums2 = extractLocationNumbers(loc2)
+  if (nums1.length === 0 || nums2.length === 0) return false
+  return nums1.length === nums2.length && nums1.every((n, i) => n === nums2[i])
+}
+
 const FULLWIDTH_DIGITS = '０１２３４５６７８９'
 const CN_DIGITS: Record<string, number> = {
   零: 0, 〇: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4,

@@ -8,6 +8,7 @@ import {
   calculateStringSimilarity,
   tokenSimilarity,
   buildingUnitMatch,
+  locationNumbersEqual,
 } from './text-similarity'
 
 export interface DuplicateCandidate {
@@ -97,6 +98,12 @@ export async function findDuplicates(params: FindDuplicatesParams): Promise<Dupl
       } else if (locSimilar >= 0.5) {
         score += 0.20 * locSimilar
         reasons.push(locSimilar >= 0.8 ? '地点一致' : '地点相近')
+      } else if (locationNumbersEqual(locationText, c.locationText)) {
+        // 同位异写补偿: 楼栋/单元号逐位一致但措辞不同 (三号楼2单元 vs 3栋2单元),
+        // 原始字符串相似度不足时不至于丢掉全部地点分;按 0.65 记地点相近。
+        // 仍只影响候选排序,不自动合并 (R2: 未校准评分不得预选关联)。
+        score += 0.2 * 0.65
+        reasons.push('地点相近')
       }
     }
 

@@ -4,6 +4,7 @@ import {
   calculateStringSimilarity,
   tokenSimilarity,
   buildingUnitMatch,
+  locationNumbersEqual,
 } from '../text-similarity'
 
 describe('calculateStringSimilarity (Levenshtein 归一化)', () => {
@@ -87,5 +88,25 @@ describe('buildingUnitMatch 中文数字归一化 (R3)', () => {
 
   it('"两" 归一化为 2', () => {
     expect(buildingUnitMatch('两栋一单元', '2栋1单元')).toBe(true)
+  })
+})
+
+describe('locationNumbersEqual (同位异写的数字序列完全一致)', () => {
+  it('措辞不同但楼栋单元号一致 → true (三号楼2单元 = 3栋2单元)', () => {
+    expect(locationNumbersEqual('三号楼2单元楼道', '3栋2单元')).toBe(true)
+  })
+
+  it('长度不同 (前缀一致) → false,不给地点分补偿', () => {
+    expect(locationNumbersEqual('3栋', '3栋2单元')).toBe(false)
+  })
+
+  it('楼栋或单元不同 → false', () => {
+    expect(locationNumbersEqual('3栋1单元', '3栋2单元')).toBe(false)
+    expect(locationNumbersEqual('4栋2单元', '3栋2单元')).toBe(false)
+  })
+
+  it('任一方无数字 → false', () => {
+    expect(locationNumbersEqual('西门口', '3栋2单元')).toBe(false)
+    expect(locationNumbersEqual('', '')).toBe(false)
   })
 })
