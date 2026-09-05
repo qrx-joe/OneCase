@@ -42,16 +42,20 @@ async function main() {
   check('分析完成', analyze.res.ok && !!analyze.data.data?.analysisId, JSON.stringify(analyze.data))
   const { analysisId, issues } = analyze.data.data
   check('拆分出 2 个事项', issues?.length === 2, `实际 ${issues?.length}`)
+  // 真实 Provider 不保证 Issue 顺序与标题措辞 (Mock 假设"照明在前"),
+  // 按标题语义定位关联/新建目标,断言放宽到 照明|灯 两种合理措辞
+  const lightingIndex = issues?.findIndex((i) => /照明|灯/.test(i.title)) ?? -1
+  const garbageIndex = issues?.findIndex((i) => i.title.includes('垃圾')) ?? -1
   if (issues?.length === 2) {
     check(
-      '事项 0 = 楼道照明',
-      issues[0].title.includes('照明'),
-      issues[0].title
+      '存在照明类事项',
+      lightingIndex >= 0,
+      `titles=${issues.map((i) => i.title).join(' | ')}`
     )
     check(
-      '事项 1 = 垃圾清运',
-      issues[1].title.includes('垃圾'),
-      issues[1].title
+      '存在垃圾类事项',
+      garbageIndex >= 0,
+      `titles=${issues.map((i) => i.title).join(' | ')}`
     )
   }
 
@@ -63,9 +67,9 @@ async function main() {
   // ===== 步骤 4: Duplicate 候选 (与 Review 页相同路径) =====
   console.log('\n── 步骤 4: Duplicate 候选 ──')
   const dup = await post('/api/duplicates/find', {
-    title: issues[0].title,
-    categoryCode: issues[0].categoryCode,
-    locationText: issues[0].locationText,
+    title: issues[lightingIndex].title,
+    categoryCode: issues[lightingIndex].categoryCode,
+    locationText: issues[lightingIndex].locationText,
   })
   const candidates = dup.data.data?.candidates || []
   check('返回候选 ≥ 1', candidates.length >= 1, JSON.stringify(dup.data))
@@ -89,8 +93,8 @@ async function main() {
   const confirm = await post(`/api/intakes/${intakeId}/confirm`, {
     analysisId,
     issueDecisions: [
-      { issueIndex: 0, decision: 'LINK_EXISTING', targetCaseId: target.caseId },
-      { issueIndex: 1, decision: 'CREATE_CASE' },
+      { issueIndex: lightingIndex, decision: 'LINK_EXISTING', targetCaseId: target.caseId },
+      { issueIndex: garbageIndex, decision: 'CREATE_CASE' },
     ],
     userId: 'demo-user',
   })
@@ -104,7 +108,7 @@ async function main() {
   console.log('\n── 步骤 6: Confirm 幂等 ──')
   const again = await post(`/api/intakes/${intakeId}/confirm`, {
     analysisId,
-    issueDecisions: [{ issueIndex: 1, decision: 'CREATE_CASE' }],
+    issueDecisions: [{ issueIndex: garbageIndex, decision: 'CREATE_CASE' }],
     userId: 'demo-user',
   })
   check(

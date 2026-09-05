@@ -128,7 +128,7 @@ async function main() {
 
     const final = (await getCase(caseNumber)).data
     check('最终 CLOSED', final.status === 'CLOSED')
-    check('version = 初始 + 4', final.version === cur.version + 1)
+    check('version 恰好 +1 (无并发递增)', final.version === cur.version + 1)
   }
 
   // ===== 场景 5: 未知状态值 =====
