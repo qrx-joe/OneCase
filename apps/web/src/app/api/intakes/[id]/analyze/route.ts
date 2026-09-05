@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { analyzeIntake, getProviderInfo, resolveProviderConfig } from '@/lib/ai-provider'
+import { PROMPT_VERSION } from '@onecase/ai'
 import { STALE_ANALYZING_MS } from '@/lib/intake-status'
 
 export async function POST(
@@ -52,6 +53,7 @@ export async function POST(
           analysisId: existing.id,
           intakeId: id,
           provider: existing.provider,
+          modelVersion: existing.modelVersion,
           issues: existingIssues.map((issue) => ({
             id: issue.id,
             title: issue.title,
@@ -172,7 +174,7 @@ export async function POST(
             intakeId: id,
             provider,
             modelVersion,
-            promptVersion: 'v1',
+            promptVersion: PROMPT_VERSION,
             schemaVersion: 'v1',
             status: 'FAILED',
             latencyMs,
@@ -206,58 +208,127 @@ export async function POST(
     const latencyMs = Date.now() - startedAt
 
     // 成功收尾也校验批次: 新分析或人工兜底接管后,迟到结果不能写入。
-    const finalized = await prisma.$transaction(async (tx) => {
-      const owned = await tx.intake.updateMany({
-        where: { id, status: 'ANALYZING', updatedAt: claimedAt },
-        data: {
-          status: 'ANALYZED',
-          updatedAt: new Date(Math.max(Date.now(), claimedAt.getTime() + 1)),
-        },
-      })
-      if (owned.count === 0) return null
+    let finalized: { id: string } | null = null
+    try {
+      finalized = await prisma.$transaction(async (tx) => {
+        const owned = await tx.intake.updateMany({
+          where: { id, status: 'ANALYZING', updatedAt: claimedAt },
+          data: {
+            status: 'ANALYZED',
+            updatedAt: new Date(Math.max(Date.now(), claimedAt.getTime() + 1)),
+          },
+        })
+        if (owned.count === 0) return null
 
-      // 创建/复用 Analysis (intakeId 唯一: 之前的 FAILED 行被复用为 COMPLETED)
-      const analysis = await tx.intakeAnalysis.upsert({
-        where: { intakeId: id },
-        update: {
-          provider,
-          modelVersion,
-          status: 'COMPLETED',
-          latencyMs,
-          errorMessage: null,
-        },
-        create: {
-          intakeId: id,
-          provider,
-          modelVersion,
-          promptVersion: 'v1',
-          schemaVersion: 'v1',
-          status: 'COMPLETED',
-          latencyMs,
-        },
-      })
+        // 创建/复用 Analysis (intakeId 唯一: 之前的 FAILED 行被复用为 COMPLETED)
+        const analysis = await tx.intakeAnalysis.upsert({
+          where: { intakeId: id },
+          update: {
+            provider,
+            modelVersion,
+            status: 'COMPLETED',
+            latencyMs,
+            errorMessage: null,
+          },
+          create: {
+            intakeId: id,
+            provider,
+            modelVersion,
+            promptVersion: PROMPT_VERSION,
+            schemaVersion: 'v1',
+            status: 'COMPLETED',
+            latencyMs,
+          },
+        })
 
-      // 创建 Issues
-      await tx.intakeIssue.createMany({
-        data: result.issues.map((issue, index) => ({
-          analysisId: analysis.id,
-          issueIndex: index,
-          title: issue.title,
-          summary: issue.summary || null,
-          categoryCode: issue.categoryCode || null,
-          locationText: issue.locationText || null,
-          impact: issue.impact,
-          urgency: issue.urgency,
-          affectedGroups: JSON.stringify(issue.affectedGroups || []),
-          riskSignals: JSON.stringify(issue.riskSignals || []),
-          missingInfo: JSON.stringify(issue.missingInformation || []),
-          evidenceConflict: issue.evidenceConflict || false,
-          suggestedPriority: issue.suggestedPriority || null,
-        })),
-      })
+        // 创建 Issues
+        await tx.intakeIssue.createMany({
+          data: result.issues.map((issue, index) => ({
+            analysisId: analysis.id,
+            issueIndex: index,
+            title: issue.title,
+            summary: issue.summary || null,
+            categoryCode: issue.categoryCode || null,
+            locationText: issue.locationText || null,
+            impact: issue.impact,
+            urgency: issue.urgency,
+            affectedGroups: JSON.stringify(issue.affectedGroups || []),
+            riskSignals: JSON.stringify(issue.riskSignals || []),
+            missingInfo: JSON.stringify(issue.missingInformation || []),
+            evidenceConflict: issue.evidenceConflict || false,
+            suggestedPriority: issue.suggestedPriority || null,
+          })),
+        })
 
-      return analysis
-    })
+        return analysis
+      })
+    } catch (saveError) {
+      // 模型已成功、结果落库失败: 与识别失败区分的专门收尾。
+      // 若本批次仍持有分析权,立即恢复为可重试状态 (否则需等 10 分钟过期接管);
+      // 若已被新分析/人工处理接管,不回退新状态;若数据库持续不可用,如实告知保存未完成。
+      const saveErrorMessage =
+        saveError instanceof Error ? saveError.message : String(saveError)
+      console.error(`Analyze 结果保存失败 (模型已成功): Intake ${id}:`, saveError)
+
+      let recovered = false
+      try {
+        recovered = await prisma.$transaction(async (tx) => {
+          const owned = await tx.intake.updateMany({
+            where: { id, status: 'ANALYZING', updatedAt: claimedAt },
+            data: {
+              status: 'PENDING',
+              updatedAt: new Date(Math.max(Date.now(), claimedAt.getTime() + 1)),
+            },
+          })
+          if (owned.count === 0) return false
+          await tx.intakeAnalysis.upsert({
+            where: { intakeId: id },
+            update: {
+              status: 'FAILED',
+              provider,
+              modelVersion,
+              latencyMs,
+              errorMessage: `RESULT_SAVE_FAILED: ${saveErrorMessage}`.slice(0, 1000),
+            },
+            create: {
+              intakeId: id,
+              provider,
+              modelVersion,
+              promptVersion: PROMPT_VERSION,
+              schemaVersion: 'v1',
+              status: 'FAILED',
+              latencyMs,
+              errorMessage: `RESULT_SAVE_FAILED: ${saveErrorMessage}`.slice(0, 1000),
+            },
+          })
+          return true
+        })
+      } catch (recoverError) {
+        console.error(`Analyze 保存失败收尾也失败 (数据库持续不可用): Intake ${id}:`, recoverError)
+      }
+
+      if (recovered) {
+        return NextResponse.json(
+          {
+            error: 'ANALYZE_SAVE_FAILED',
+            message:
+              'AI 已完成识别,但结果保存失败;已恢复为可重试状态,请直接重试。问题持续出现请联系管理员。',
+          },
+          { status: 500 }
+        )
+      }
+
+      // 收尾未完成: 可能已被其他操作接管,也可能数据库持续不可用。
+      // 不伪报可即时恢复;保留过期接管机制 (STALE_ANALYZING_MS) 兜底。
+      return NextResponse.json(
+        {
+          error: 'ANALYZE_SAVE_FAILED',
+          message:
+            'AI 已完成识别,但结果保存未完成,状态未能立即恢复。请稍后重试;若持续失败请等待系统自动接管或使用手动创建。',
+        },
+        { status: 500 }
+      )
+    }
 
     if (!finalized) {
       console.error(`Analyze 结果丢弃: Intake ${id} 已在分析期间被其他操作处理`)
@@ -275,6 +346,7 @@ export async function POST(
         analysisId: finalized.id,
         intakeId: id,
         provider,
+        modelVersion,
         issues: result.issues,
         processingNotes: result.processingNotes,
       },

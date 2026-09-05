@@ -6,6 +6,7 @@ export default defineConfig({
   resolve: {
     alias: {
       // workspace 包未构建 dist,单测直接指向源码
+      '@': path.resolve(__dirname, './src'),
       '@onecase/ai': path.resolve(__dirname, '../../packages/ai/src'),
       '@onecase/domain': path.resolve(__dirname, '../../packages/domain/src'),
       '@onecase/contracts': path.resolve(__dirname, '../../packages/contracts/src'),
