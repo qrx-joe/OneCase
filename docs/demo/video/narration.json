@@ -1,0 +1,110 @@
+{
+  "comment": "备份演示视频分镜与配音稿。type: card=静态卡(browser 外), browser=Playwright 录屏段。narration 同时用作字幕文本(按句切分)。",
+  "cast": "zh-CN-XiaoxiaoNeural",
+  "segments": [
+    {
+      "id": "S01",
+      "type": "card",
+      "title": "一件事 OneCase",
+      "subtitle": "社区事项 AI 工作台",
+      "note": "备份演示视频 · 数据全部为合成数据",
+      "narration": "这是 OneCase 的演示视频，一个给社区工作者用的 AI 工作台。先说清楚：里面的数据全是合成的。"
+    },
+    {
+      "id": "S02",
+      "type": "browser",
+      "action": "login",
+      "narration": "打开系统，先登录。演示环境的账号密码是固定的，输进去就行。真到部署的时候，这里会换成正式的身份认证。"
+    },
+    {
+      "id": "S03",
+      "type": "browser",
+      "action": "dashboard",
+      "narration": "进来是今日工作。待处理两条，处理中三条。这个数字只统计确认过的事项，AI 草稿不算在内。"
+    },
+    {
+      "id": "S04",
+      "type": "browser",
+      "action": "intake",
+      "narration": "居民的原始留言是这样的。一条消息里其实藏着两件事：楼道灯坏了，垃圾也没人清。我们不做预处理，原文直接贴进来，让 AI 先整理一遍。"
+    },
+    {
+      "id": "S05",
+      "type": "browser",
+      "action": "review",
+      "narration": "几秒钟后，AI 把这条消息拆成了两个事项草稿。灯是 P2，老人晚上通行有风险；垃圾是 P3。每张卡上都写着：AI 草稿，未写入事项。它不知道的，比如具体楼层，就标缺失，不瞎猜。"
+    },
+    {
+      "id": "S06",
+      "type": "browser",
+      "action": "duplicates",
+      "narration": "整理的同时，系统还在查重。CASE-018，同样是三栋二单元的灯，地点一致、类别一致，排第一。要是出现同栋楼不同单元的，系统会标上位置不同，提醒你别合并错。标题我再手动改一下，改完以人改的为准，AI 原来的值留底。"
+    },
+    {
+      "id": "S07",
+      "type": "browser",
+      "action": "confirm",
+      "narration": "灯这件事，关联到 CASE-018。垃圾是新事，新建一条。两个决定都是人选的。点确认，一次提交，要么全成，要么全不动。"
+    },
+    {
+      "id": "S08",
+      "type": "browser",
+      "action": "detail",
+      "narration": "打开被关联的 CASE-018。居民来源多了一条，就是刚才那条留言，时间线里也记了这笔。灯修好了，状态改成已解决。每次变更有记录，两个人同时改也不会互相覆盖。"
+    },
+    {
+      "id": "S09",
+      "type": "browser",
+      "action": "dashboardAgain",
+      "narration": "回到首页，数字跟着变了。消息进来，人做决定，事项跟到底。完整的一条链路，就这么走下来了。"
+    },
+    {
+      "id": "S09B",
+      "type": "browser",
+      "action": "casesList",
+      "narration": "所有事项都在同一本台账里。按状态筛，按关键词搜，每件事到哪一步，一眼能看清。"
+    },
+    {
+      "id": "S10",
+      "type": "browser",
+      "action": "image",
+      "narration": "居民也常发照片。切到图片，上传一张楼道灯的照片，AI 整理。这是真实模型的现场输出，一次结果不代表准确率。草稿旁边能看到原图，可以对照着核。"
+    },
+    {
+      "id": "S11",
+      "type": "browser",
+      "action": "fallback",
+      "narration": "那 AI 要是挂了呢？输入不会丢，可以重试，也可以走手动创建，原始留言自动挂到新事项下面。AI 不是单点。"
+    },
+    {
+      "id": "S12",
+      "type": "browser",
+      "action": "settings",
+      "narration": "设置页里，账号信息、通知偏好，这些开关是真实生效的，能控制顶栏铃铛提醒什么。AI 用的哪个模型，这里也如实显示。没做的功能都标了敬请期待，不装。"
+    },
+    {
+      "id": "S12B",
+      "type": "card",
+      "title": "下一步：对照实验",
+      "subtitle": "人工整理 vs OneCase 辅助 · 同一批授权脱敏反馈",
+      "note": "比耗时 / 比漏项 / 比误关联 · 验收标准事先商定，用数据决定投入",
+      "narration": "落地第一步不是卖产品，是做对照实验。同一批脱敏后的真实反馈，一边人工整理，一边用 OneCase 辅助，比耗时、比漏项、比误关联，验收标准事先商定，用数据决定投入。"
+    },
+    {
+      "id": "S13",
+      "type": "card",
+      "title": "验证依据",
+      "subtitle": "213 项单元测试 · 99 项业务不变量 · 32 项端到端测试",
+      "note": "2026-09-06 全量复跑 · CI 同一条流水线 · 真实模型独立评估 30 次调用",
+      "narration": "工程上，今天全量复跑，213 项单元测试，99 项业务不变量，32 项端到端测试，全部通过。CI 每次提交都跑同一条流水线。模型质量做了三十次真实调用的独立评估，结果如实记录，包括没达标的部分。"
+    },
+    {
+      "id": "S14",
+      "type": "card",
+      "title": "Message ≠ Case\nAI Draft ≠ Business Fact",
+      "subtitle": "AI 提效率，人守事实",
+      "note": "OneCase · 社区事项 AI 工作台",
+      "narration": "最后，这个系统底下压着两条规矩：消息不等于事项，AI 草稿不等于业务事实。AI 提效率，人守事实。这就是 OneCase。"
+    }
+  ]
+}
