@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getExtractionProvider, getProviderInfo } from '@/lib/ai-provider'
+import { getExtractionProvider, getProviderInfo, isVisionCapableModel } from '@/lib/ai-provider'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,11 +8,19 @@ export async function GET() {
   try {
     getExtractionProvider()
     const { provider, modelVersion } = getProviderInfo()
-    return NextResponse.json({ data: { provider, model: modelVersion, imageProviderConfigured: provider !== 'mock' } }, {
+    return NextResponse.json({
+      data: {
+        provider,
+        model: modelVersion,
+        imageProviderConfigured: provider !== 'mock',
+        // 模型级判断: 非 Mock 但配置了纯文本模型时为 false,UI 如实提示而不是冒认视觉能力
+        imageModelSupported: isVisionCapableModel(provider, modelVersion),
+      },
+    }, {
       headers: { 'Cache-Control': 'no-store' },
     })
   } catch {
-    return NextResponse.json({ data: { provider: null, imageProviderConfigured: false } }, {
+    return NextResponse.json({ data: { provider: null, imageProviderConfigured: false, imageModelSupported: false } }, {
       headers: { 'Cache-Control': 'no-store' },
     })
   }

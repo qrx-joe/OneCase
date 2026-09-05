@@ -126,3 +126,26 @@ export function getProviderInfo(): { provider: ProviderType; modelVersion: strin
 export async function analyzeIntake(rawText: string, attachments?: ExtractionInput['attachments']) {
   return getExtractionProvider().extractCaseDraft({ rawText, attachments })
 }
+
+/**
+ * 模型级视觉能力判断 (保守白名单,宁缺勿冒认):
+ * 未知模型一律返回 false,由 UI 如实提示"可能无法识别",不得宣称支持视觉。
+ * 这里只做装配期提示;真实识别能力仍以合成图片冒烟为准 (docs/testing/image-intake.md)。
+ */
+export function isVisionCapableModel(type: ProviderType, model: string): boolean {
+  const m = (model || '').toLowerCase()
+  switch (type) {
+    case 'mock':
+      // Mock 不产生真实识别,不得宣称视觉能力
+      return false
+    case 'qwen':
+      // 视觉系列: qwen-vl-* / qwen2.5-vl-* / qwen-omni-*;纯文本 (qwen-turbo/plus/max/long) 不支持
+      return /qwen[\w.]*-(vl|omni|video)/.test(m)
+    case 'openai':
+      // 多模态系列: gpt-4o* / gpt-4.1* / gpt-4-turbo* / o 系;gpt-3.5 与基础 gpt-4 不支持
+      return /^(gpt-4o|gpt-4\.1|gpt-4-turbo|chatgpt-4o|o[1-9])/.test(m)
+    case 'stepfun':
+      // 视觉系列: step-1o* / step-1v* / step-3v*;step-2* / step-1-8k 等纯文本不支持
+      return /^(step-1o|step-1v|step-3v)/.test(m)
+  }
+}

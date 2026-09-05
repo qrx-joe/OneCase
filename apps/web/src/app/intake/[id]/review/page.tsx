@@ -41,6 +41,8 @@ export default function IntakeReviewPage() {
   const intakeId = params.id as string
 
   const [analysisId, setAnalysisId] = useState<string | null>(null)
+  // 实际生成本草稿的 provider/model (与 IntakeAnalysis 审计同源;Demo 降级时如实显示 mock)
+  const [aiMeta, setAiMeta] = useState<{ provider?: string; model?: string } | null>(null)
   const [issues, setIssues] = useState<Issue[]>([])
   // 每个 issue 一组候选: candidates[issueIndex] = DuplicateCandidate[]
   const [candidates, setCandidates] = useState<DuplicateCandidate[][]>([])
@@ -78,6 +80,7 @@ export default function IntakeReviewPage() {
         }
 
         setAnalysisId(data.data.analysisId)
+        setAiMeta({ provider: data.data.provider, model: data.data.modelVersion })
         setIssues(data.data.issues || [])
 
         // 2. 为每个 issue 并行获取 Duplicate 候选 (草稿字段直传评分)
@@ -392,6 +395,13 @@ export default function IntakeReviewPage() {
             <Badge variant="purple">AI 建议</Badge>
           </div>
           <p>识别到 {issues.length} 个潜在事项，需要人工确认。</p>
+          {aiMeta?.provider && (
+            <p style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>
+              本草稿由 {aiMeta.provider} / {aiMeta.model || '未知模型'} 生成
+              {aiMeta.provider === 'mock' ? '（Mock 模式：仅演示流程，非真实识别）' : ''}。
+              草稿不自动生效，以下决策均由人工确认。
+            </p>
+          )}
         </div>
         <div className="actions">
           <Button variant="ghost" size="sm" onClick={() => router.push('/intake')}>

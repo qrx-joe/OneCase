@@ -18,6 +18,8 @@ export default function NewIntakePage() {
   const [readingImage, setReadingImage] = useState(false)
   const [imageError, setImageError] = useState<string | null>(null)
   const [imageProviderConfigured, setImageProviderConfigured] = useState<boolean | null>(null)
+  // 模型级视觉能力 (能力白名单判断): 非 Mock 但配置了纯文本模型时为 false
+  const [imageModel, setImageModel] = useState<{ supported: boolean; model: string } | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const requestKey = useRef<{ rawText: string; imageUrl?: string; key: string } | null>(null)
   const selectingImage = useRef(false)
@@ -34,7 +36,13 @@ export default function NewIntakePage() {
     const controller = new AbortController()
     void fetch('/api/intakes/capabilities', { cache: 'no-store', signal: controller.signal })
       .then(response => response.json())
-      .then(body => { if (!controller.signal.aborted) setImageProviderConfigured(body.data?.imageProviderConfigured ?? null) })
+      .then(body => {
+        if (controller.signal.aborted) return
+        setImageProviderConfigured(body.data?.imageProviderConfigured ?? null)
+        if (body.data?.provider != null) {
+          setImageModel({ supported: !!body.data?.imageModelSupported, model: String(body.data?.model ?? '') })
+        }
+      })
       .catch(() => { /* 状态检查失败不阻塞输入，实际分析接口仍会返回错误。 */ })
     return () => controller.abort()
   }, [])
@@ -226,7 +234,8 @@ export default function NewIntakePage() {
             <div><span>{image.name}</span><Button variant="ghost" size="sm" disabled={busy} onClick={() => { setImage(null); setImageError(null) }}>移除图片</Button></div>
           </div>}
           <p className="field-hint">选择图片后，点击“AI 整理为事项”才会上传并调用模型。请先遮挡姓名、电话等非必要信息。</p>
-          {(mode === 'image' || image) && imageProviderConfigured === false && <p className="image-input-error" role="status">当前未配置可用的真实图片模型（可能处于 Mock 模式）。图片可以保存，但无法自动识别；需配置支持视觉的 Qwen/OpenAI 模型，或在保存后手动创建事项。</p>}
+          {(mode === 'image' || image) && imageProviderConfigured === false && <p className="image-input-error" role="status">当前未配置可用的真实图片模型（可能处于 Mock 模式）。图片可以保存，但无法自动识别；需配置支持视觉的 Qwen/OpenAI/StepFun 模型，或在保存后手动创建事项。</p>}
+          {(mode === 'image' || image) && imageProviderConfigured === true && imageModel && !imageModel.supported && <p className="image-input-error" role="status">当前模型 {imageModel.model} 不在已知的视觉模型清单中，自动识别可能失败。请改配支持视觉的模型（如 step-1o-turbo-vision、qwen2.5-vl 系列），或改用文字输入 / 保存后手动创建事项。</p>}
         </div>
 
         {/* 右侧: 步骤说明 */}
