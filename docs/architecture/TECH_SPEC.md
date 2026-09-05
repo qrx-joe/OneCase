@@ -4,13 +4,15 @@
 架构原则：Modular Monolith First
 目标：72 小时能交付 Mock-first MVP，后续接真实 Provider 时不推翻 Domain 边界。
 
-## 当前实现补充（2026-08-31）
+## 当前实现补充（2026-09-05）
 
 本文其余部分保留设计基线，不代表全部落地。当前使用 SQLite，图片分析仍为同步请求；尚未实现下文规划的 PostgreSQL 队列、signed URL 或生产权限。
 
 图片从 Intake 页面以 multipart 提交到现有创建接口，服务端检查实际请求大小、MIME 和文件头，在一个事务中写入 Intake 与 Attachment。图片以 data URL 存入 Attachment，不写公开目录。分析接口读取附件，通过 Provider 的 `image_url` 消息提交；模型输出沿用 Zod 校验、失败记录和人工确认。GET 详情支持恢复图片，确认页和手动创建页显示原图。
 
-本次没有迁移数据库或增加依赖，未改查重、正式事项确认及状态机规则。Mock 拒绝图片，不模拟成功；真实模型未实测。完整字段与验证记录见 [图片输入说明](../testing/image-intake.md)。
+当前 Provider 包含 Mock、Qwen、OpenAI 与 StepFun。StepFun 复用 OpenAI-compatible 实现，支持独立 Key/Model、超时、有限重试、Schema 校验和实际 provider/model 审计。Mock 拒绝图片，不模拟成功。2026-09-05 一条合成图片 Intake 已在运行态通过 StepFun 完成分析并进入 Review；该单例不构成识别质量验收。完整字段与验证记录见 [图片输入说明](../testing/image-intake.md)。
+
+当前正常路径为：`Intake/Attachment -> StepFun -> Schema -> IntakeAnalysis/IntakeIssue -> Review -> 人工确认 -> Case/CaseSource/CaseAction`。前半段有真实运行证据，后半段由 provider-neutral 业务不变量验证。仍有四个实现缺口：AI 成功后最终数据库事务失败时可能暂留 `ANALYZING`；Playwright E2E 未隔离数据库和 Provider；`imageProviderConfigured` 仅按非 Mock 判断；Review 尚未展示实际 provider/model。详见 [StepFun 接入闭环审查](../review/StepFun接入闭环审查-2026-09-05.md)。
 
 ## 1. 决策原则
 
@@ -170,7 +172,8 @@ export interface EmbeddingProvider {
 
 - Timeout/5xx：有限重试；不得无限 retry。
 - Invalid Schema：最多一次 repair，再进入人工路径。
-- Primary Provider 不可用：可切 fallback 或 Mock Demo。
+- Provider 配置失败：仅当 `DEMO_MODE=true` 与 `AI_ALLOW_MOCK_FALLBACK=true` 同时开启时，允许装配层降级 Mock，并按 `mock / mock-v1` 审计。
+- Provider 运行时请求失败：记录 FAILED、回退 Intake 为 PENDING，允许重试或人工创建；当前不会自动切 Mock。
 - Embedding 不可用：Case 仍可创建，Duplicate 延后。
 
 ## 8. Duplicate Detection
@@ -196,20 +199,20 @@ MVP：先 exact cosine，并叠加 tenant/status/time/category filters。初始�
 
 前缀：`/api/v1`
 
-| Method | Path | Purpose |
-|---|---|---|
-| POST | `/intakes` | 创建 Intake，支持 Idempotency-Key |
-| GET | `/intakes/:id` | 查看 Intake |
-| POST | `/intakes/:id/analyze` | 发起分析；真实异步模式返回 202/jobId |
-| GET | `/jobs/:id` | 查询分析任务 |
-| GET | `/intakes/:id/analysis` | 获取 Draft |
-| POST | `/intakes/:id/confirm` | 事务性 Create/Link |
-| GET | `/cases` | Case 列表 |
-| GET | `/cases/:id` | Case Detail |
-| PATCH | `/cases/:id` | 带 expectedVersion 更新 |
-| POST | `/cases/:id/status` | 状态迁移 |
-| GET | `/cases/:id/activity` | Timeline |
-| GET | `/dashboard` | 已确认 Case 指标 |
+| Method | Path                    | Purpose                              |
+| ------ | ----------------------- | ------------------------------------ |
+| POST   | `/intakes`              | 创建 Intake，支持 Idempotency-Key    |
+| GET    | `/intakes/:id`          | 查看 Intake                          |
+| POST   | `/intakes/:id/analyze`  | 发起分析；真实异步模式返回 202/jobId |
+| GET    | `/jobs/:id`             | 查询分析任务                         |
+| GET    | `/intakes/:id/analysis` | 获取 Draft                           |
+| POST   | `/intakes/:id/confirm`  | 事务性 Create/Link                   |
+| GET    | `/cases`                | Case 列表                            |
+| GET    | `/cases/:id`            | Case Detail                          |
+| PATCH  | `/cases/:id`            | 带 expectedVersion 更新              |
+| POST   | `/cases/:id/status`     | 状态迁移                             |
+| GET    | `/cases/:id/activity`   | Timeline                             |
+| GET    | `/dashboard`            | 已确认 Case 指标                     |
 
 统一响应：`data`、`error`、`meta.requestId`。错误码至少覆盖认证/权限/租户、文件、AI、Schema、状态迁移、版本冲突、重复关联、限流和内部错误。
 
@@ -266,6 +269,7 @@ MVP：先 exact cosine，并叠加 tenant/status/time/category filters。初始�
 ### E2E
 
 - 黄金链路 Create Intake -> Analyze -> Review -> Link/Create -> Case Detail -> Dashboard。
+- E2E 必须使用独立数据库并显式固定 Mock；真实 Provider 冒烟另设显式命令。当前 Playwright 尚未做到这一隔离，不能对正在演示的 3000 端口实例直接运行。
 - AI down、no duplicate、wrong duplicate、permission denied、version conflict、network retry。
 
 ## 14. CI Gate
