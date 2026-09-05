@@ -1,10 +1,10 @@
 # OneCase MVP 执行任务
 
-状态：保留原始执行基线；当前实现状态更新于 2026-08-31
+状态：保留原始执行基线；当前实现状态更新于 2026-09-05
 来源：`D:\EdgeDownload\OneCase｜社区事项 AI 工作台：深度研究与双文档交付.pdf`
 目标：把研究稿转成一个可验证、可演示、可回滚的社区事项 AI 工作台 MVP。
 
-当前进度：文字流程已实现；图片选择、预览、上传、恢复及 Qwen/OpenAI 图片传参已接通。当前本地运行 Mock，真实图片识别尚待配置模型和验收；语音仍不在本轮范围。最近验证为 AI 52 项、Web 24 项单元测试以及定向接口／浏览器检查，不表示以下所有阶段全部验收通过。详见 [图片验证记录](docs/testing/image-intake.md)。本项目由 1 人独立开发，AI+民生个人参赛；报名与材料状态见 [提交说明](docs/competition/preliminary-2026/README.md)。下文的阶段计划及早期问题不自动代表当前事实。
+当前进度：文字流程与单张图片输入已实现，Qwen/OpenAI/StepFun 的文字和图片消息已接通。2026-09-05 运行态为 `stepfun / step-1o-turbo-vision`，一条合成图片 Intake 已真实完成分析、通过 Schema 并进入 Review；这只证明链路可运行，不代表识别质量验收。最近复跑 AI 74、Web 64、Contracts 25、Domain 33 项单元测试及独立临时数据库上的 93 项业务不变量；三条黄金链路脚本（golden-path 的分析步骤走真实 stepfun 调用）全绿。原「尚未闭合」四项已闭合：R4 落库失败即时恢复（代码+R4 回归测试）、E2E 数据库/Provider 隔离（专用端口 3100 + e2e-demo.db + 强制 Mock）、视觉能力精确判断（模型级白名单 `imageModelSupported`，未知模型不冒认）、Review 页展示实际 provider/model。仍开放：真实识别**验收线待本人拍板**——探索轮已于 2026-09-05 完成（step-1o-turbo-vision，30 次真实调用：自动字段检查 23/26 通过，注入样本 I08 模型跟随了恶意地点指令，无事项输入暴露 Schema ≥1 事项边界，4 样本待人工审核；详见 [评估记录](docs/devlog/REAL_MODEL_QUALITY_EVAL_2026-09-05.md)），拍板前 README「真实识别未验收」口径不变。SQLite→PostgreSQL 已拍板参赛阶段不迁移（[ADR-003](docs/adr/003-sqlite-postgresql-timing.md)）。详见 [图片验证记录](docs/testing/image-intake.md)与 [StepFun 闭环审查](docs/review/StepFun接入闭环审查-2026-09-05.md)。本项目由 1 人独立开发，AI+民生个人参赛；报名与材料状态见 [提交说明](docs/competition/preliminary-2026/README.md)。下文的阶段计划及早期问题不自动代表当前事实。
 
 ## 0. 执行模型必须遵守的工作方式
 

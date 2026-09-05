@@ -28,7 +28,11 @@
 
 ## 已记录决策
 
-*(当前无记录,待首个重要决策后创建)*
+| ADR | 标题 | 状态 |
+|---|---|---|
+| [001](001-modular-monolith.md) | Modular Monolith 工程边界 | Accepted |
+| [002](002-mock-provider-first.md) | MockProvider First,后接真实 AI | Accepted |
+| [003](003-sqlite-postgresql-timing.md) | SQLite→PostgreSQL 迁移时机——参赛阶段不迁移 | Accepted |
 
 ---
 
