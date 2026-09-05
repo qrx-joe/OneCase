@@ -89,8 +89,8 @@ export async function findDuplicates(params: FindDuplicatesParams): Promise<Dupl
         calculateStringSimilarity(locationText, c.locationText),
         tokenSimilarity(locationText, c.locationText)
       )
-      // Hard Negative 保护: 提取楼栋/单元号对比,数字不同则视为不同地点
-      // ("3栋1单元" vs "3栋2单元" 字符相似度 0.8,但单元号不同 = 不同位置)
+      // Hard Negative 保护: 楼栋/单元号归一化 (中文/全角数字→阿拉伯) 后对比,
+      // 数字不同则视为不同地点 ("3栋1单元" vs "三栋2单元"、"3栋1单元" vs "3栋2单元" 均判不同位置)
       const sameBuilding = buildingUnitMatch(locationText, c.locationText)
       if (!sameBuilding) {
         reasons.push('位置不同')

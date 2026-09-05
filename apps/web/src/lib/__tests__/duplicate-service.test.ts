@@ -50,3 +50,42 @@ describe('buildingUnitMatch (Hard Negative 保护)', () => {
     expect(buildingUnitMatch('西门口', '南门')).toBe(true)
   })
 })
+
+describe('buildingUnitMatch 中文数字归一化 (R3)', () => {
+  it('中文数字单元不同 → 必须判不同地点 (修复前误判同楼)', () => {
+    expect(buildingUnitMatch('三栋一单元', '三栋二单元')).toBe(false)
+  })
+
+  it('中文数字与阿拉伯数字表示同一结构化位置 → 判同', () => {
+    expect(buildingUnitMatch('三栋二单元', '3栋2单元')).toBe(true)
+  })
+
+  it('"十二栋" 等十位组合归一化 → 12', () => {
+    expect(buildingUnitMatch('十二栋', '12栋')).toBe(true)
+    expect(buildingUnitMatch('十二栋', '13栋')).toBe(false)
+    expect(buildingUnitMatch('二十三栋', '23栋')).toBe(true)
+  })
+
+  it('全角数字归一化 → 与半角等价', () => {
+    expect(buildingUnitMatch('３栋２单元', '3栋2单元')).toBe(true)
+    expect(buildingUnitMatch('３栋２单元', '3栋3单元')).toBe(false)
+  })
+
+  it('混合写法 ("3栋二单元") → 与 "3栋2单元" 判同', () => {
+    expect(buildingUnitMatch('3栋二单元', '3栋2单元')).toBe(true)
+  })
+
+  it('缺失单元/无数字地址 → 保持不确定性,不误报位置不同', () => {
+    expect(buildingUnitMatch('三栋', '三栋二单元')).toBe(true)
+    expect(buildingUnitMatch('西门口', '西门口')).toBe(true)
+  })
+
+  it('含门牌号的地址: 楼栋与门牌逐位对比', () => {
+    expect(buildingUnitMatch('解放路25号3栋2单元', '解放路25号3栋2单元')).toBe(true)
+    expect(buildingUnitMatch('解放路25号3栋2单元', '解放路26号3栋2单元')).toBe(false)
+  })
+
+  it('"两" 归一化为 2', () => {
+    expect(buildingUnitMatch('两栋一单元', '2栋1单元')).toBe(true)
+  })
+})

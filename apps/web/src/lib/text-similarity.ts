@@ -47,14 +47,17 @@ function bigrams(s: string): string[] {
 }
 
 /**
- * 楼栋/单元号匹配: 提取地点中的数字序列对比
+ * 楼栋/单元号匹配: 归一化后提取地点中的数字序列对比
+ * - 中文数字、全角数字先归一化为阿拉伯数字:
+ *   "三栋二单元"→"3栋2单元"、"十二栋"→"12栋"、"３栋"→"3栋"
+ *   (归一化只用于对比,原始地址仍原样展示和审计)
  * - "3栋2单元" → ["3","2"], "3栋1单元" → ["3","1"] → 数字不一致 → false
  * - "3栋2单元" vs "3栋" → ["3","2"] vs ["3"] → 前缀一致,长度不同 → 仍视为同楼 (true, 由相似度决定权重)
- * - 无数字 ("西门口") → 无法判定,返回 true 交由相似度处理
+ * - 无数字 ("西门口") → 无法判定,返回 true 交由相似度处理 (保持不确定性,不误报一致)
  */
 export function buildingUnitMatch(loc1: string, loc2: string): boolean {
-  const nums1 = loc1.match(/\d+/g) || []
-  const nums2 = loc2.match(/\d+/g) || []
+  const nums1 = extractLocationNumbers(loc1)
+  const nums2 = extractLocationNumbers(loc2)
 
   // 任一方无数字信息,不做 Hard Negative 判定
   if (nums1.length === 0 || nums2.length === 0) return true
@@ -65,6 +68,59 @@ export function buildingUnitMatch(loc1: string, loc2: string): boolean {
     if (nums1[i] !== nums2[i]) return false
   }
   return true
+}
+
+/** 归一化后提取数字序列: 全角数字与常见中文数字统一转为阿拉伯数字再提取 */
+export function extractLocationNumbers(loc: string): string[] {
+  return normalizeNumerals(loc).match(/\d+/g) || []
+}
+
+const FULLWIDTH_DIGITS = '０１２３４５６７８９'
+const CN_DIGITS: Record<string, number> = {
+  零: 0, 〇: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4,
+  五: 5, 六: 6, 七: 7, 八: 8, 九: 9,
+}
+const CN_UNIT_CHARS: Record<string, number> = { 十: 10, 百: 100 }
+
+// 把地址中的中文数字串与全角数字归一化为阿拉伯数字字符串
+function normalizeNumerals(loc: string): string {
+  let out = ''
+  let cnRun = ''
+  const flushRun = () => {
+    if (cnRun) {
+      out += String(parseCnNumeralRun(cnRun))
+      cnRun = ''
+    }
+  }
+  for (const ch of loc) {
+    const fullwidth = FULLWIDTH_DIGITS.indexOf(ch)
+    if (fullwidth >= 0) {
+      flushRun()
+      out += String(fullwidth)
+    } else if (ch in CN_DIGITS || ch in CN_UNIT_CHARS) {
+      cnRun += ch
+    } else {
+      flushRun()
+      out += ch
+    }
+  }
+  flushRun()
+  return out
+}
+
+// 解析连续中文数字串 (覆盖楼栋/单元常见范围,如 十=10、二十三=23、一百零三=103)
+function parseCnNumeralRun(run: string): number {
+  let total = 0
+  let current = 0
+  for (const ch of run) {
+    if (ch in CN_DIGITS) {
+      current = CN_DIGITS[ch]
+    } else if (ch in CN_UNIT_CHARS) {
+      total += (current || 1) * CN_UNIT_CHARS[ch]
+      current = 0
+    }
+  }
+  return total + current
 }
 
 function levenshteinDistance(str1: string, str2: string): number {
