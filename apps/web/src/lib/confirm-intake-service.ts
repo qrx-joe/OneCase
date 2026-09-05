@@ -151,6 +151,19 @@ export async function confirmIntake(params: ConfirmIntakeParams): Promise<Confir
         }
       }
 
+      // ---- 类别字典校验 (AI 产出视为草稿: 字典外类别不得成为业务事实) ----
+      // AI 可能输出字典外 categoryCode (真实评估实测输出过 HEALTH);建案前对照本组织
+      // Category 表,不在字典的类别置空 (未分类),AI 原值保留在 IntakeIssue 可追溯。
+      const hasCreateDecision = issueDecisions.some((d) => d.decision === 'CREATE_CASE')
+      const validCategoryCodes = new Set(
+        hasCreateDecision
+          ? (await tx.category.findMany({
+              where: { organizationId: intake.organizationId },
+              select: { code: true },
+            })).map((c) => c.code)
+          : []
+      )
+
       for (const decision of issueDecisions) {
         const issue = issueMap.get(decision.issueIndex)
 
@@ -189,6 +202,11 @@ export async function confirmIntake(params: ConfirmIntakeParams): Promise<Confir
             editedLocation !== undefined
               ? editedLocation || undefined
               : issue.locationText || undefined
+          // 字典外类别 → 未分类 (未知字段保持 null,不猜测;AI 原值在 IntakeIssue)
+          const categoryOutOfDictionary =
+            !!issue.categoryCode && !validCategoryCodes.has(issue.categoryCode)
+          const finalCategory =
+            issue.categoryCode && !categoryOutOfDictionary ? issue.categoryCode : undefined
 
           const newCase = await tx.case.create({
             data: {
@@ -196,7 +214,7 @@ export async function confirmIntake(params: ConfirmIntakeParams): Promise<Confir
               caseNumber,
               title: editedTitle ?? issue.title,
               summary: issue.summary || undefined,
-              categoryCode: issue.categoryCode || undefined,
+              categoryCode: finalCategory,
               locationText: finalLocation,
               priority,
               status: 'OPEN',
@@ -213,6 +231,9 @@ export async function confirmIntake(params: ConfirmIntakeParams): Promise<Confir
           }
           if (edit.suggestedPriority && edit.suggestedPriority !== issue.suggestedPriority) {
             editedNotes.push(`优先级 ${issue.suggestedPriority || '(空)'} → ${edit.suggestedPriority}`)
+          }
+          if (categoryOutOfDictionary) {
+            editedNotes.push(`类别「${issue.categoryCode}」不在字典,已记为未分类`)
           }
 
           // 创建 CaseSource

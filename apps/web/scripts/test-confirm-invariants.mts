@@ -659,6 +659,40 @@ async function main() {
   const dStatus = (await prisma.intake.findUnique({ where: { id: d.intakeId } }))!.status
   check('跨组织 LINK 被拒后零写入', beforeD.cases === afterD.cases && beforeD.sources === afterD.sources && dStatus === 'ANALYZED', JSON.stringify({ afterD, dStatus }))
 
+  // ============================================================
+  // §8 类别字典校验 (AI 字典外类别不得成为业务事实;彩排发现 R1)
+  // ============================================================
+  console.log('\n── §8-1 字典外类别建案 → 未分类 + 审计留痕 ──')
+  const e = await createAnalyzedIntake('居民咨询高龄补贴年审要不要带证件。')
+  // fixture 的 Issue 不带类别,直接写入字典外/字典内两个对照值
+  const issueRows = await prisma.intakeIssue.findMany({ where: { analysisId: e.analysisId }, orderBy: { issueIndex: 'asc' } })
+  await prisma.intakeIssue.update({ where: { id: issueRows[0].id }, data: { categoryCode: 'HEALTH' } })
+  const confirmE = await confirmIntake({
+    intakeId: e.intakeId,
+    analysisId: e.analysisId,
+    issueDecisions: [{ issueIndex: 0, decision: 'CREATE_CASE' }],
+  })
+  check('CREATE_CASE 确认成功', confirmE.success && confirmE.createdCases.length === 1, JSON.stringify(confirmE.errors))
+  const healthCase = await prisma.case.findUniqueOrThrow({ where: { id: confirmE.createdCases[0].id } })
+  check('字典外 HEALTH → Case 类别为空 (未分类)', healthCase.categoryCode === null, `实际 ${healthCase.categoryCode}`)
+  const healthAction = await prisma.caseAction.findFirstOrThrow({ where: { caseId: healthCase.id }, orderBy: { id: 'desc' } })
+  check('审计留痕注明类别不在字典', /HEALTH/.test(healthAction.note ?? '') && /未分类/.test(healthAction.note ?? ''), `note=${healthAction.note}`)
+  const healthIssue = await prisma.intakeIssue.findUniqueOrThrow({ where: { id: issueRows[0].id } })
+  check('AI 原值保留在 IntakeIssue', healthIssue.categoryCode === 'HEALTH', `实际 ${healthIssue.categoryCode}`)
+
+  console.log('\n── §8-2 字典内类别不受影响 ──')
+  const f = await createAnalyzedIntake('居民咨询高龄补贴年审要不要带证件。')
+  const issueRowsF = await prisma.intakeIssue.findMany({ where: { analysisId: f.analysisId }, orderBy: { issueIndex: 'asc' } })
+  await prisma.intakeIssue.update({ where: { id: issueRowsF[0].id }, data: { categoryCode: 'PUBLIC_FACILITIES' } })
+  const confirmF = await confirmIntake({
+    intakeId: f.intakeId,
+    analysisId: f.analysisId,
+    issueDecisions: [{ issueIndex: 0, decision: 'CREATE_CASE' }],
+  })
+  check('CREATE_CASE 确认成功', confirmF.success && confirmF.createdCases.length === 1, JSON.stringify(confirmF.errors))
+  const dictCase = await prisma.case.findUniqueOrThrow({ where: { id: confirmF.createdCases[0].id } })
+  check('字典内 PUBLIC_FACILITIES 原样落库', dictCase.categoryCode === 'PUBLIC_FACILITIES', `实际 ${dictCase.categoryCode}`)
+
   await checkIntakeBoundaries()
   console.log(`\n业务不变量: ${checked - failed}/${checked} 项通过`)
   } finally {
