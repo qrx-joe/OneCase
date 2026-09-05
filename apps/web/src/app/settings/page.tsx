@@ -92,6 +92,8 @@ export default function SettingsPage() {
   const [session, setSession] = useState<DemoSession | null>(null)
   const [prefs, setPrefs] = useState<NotifyPrefs>(DEFAULT_NOTIFY_PREFS)
   const [caps, setCaps] = useState<CapabilitiesInfo | null>(null)
+  // loading → ok/error: 加载完成前不显示"无法读取",避免误导
+  const [capsLoaded, setCapsLoaded] = useState(false)
 
   // 会话与偏好读取放在 effect：SSR 首帧用占位值，避免水合不一致
   useEffect(() => {
@@ -105,10 +107,14 @@ export default function SettingsPage() {
     fetch('/api/intakes/capabilities', { cache: 'no-store', signal: controller.signal })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error('failed'))))
       .then((body) => {
-        if (!controller.signal.aborted) setCaps(body?.data ?? null)
+        if (controller.signal.aborted) return
+        setCaps(body?.data ?? null)
+        setCapsLoaded(true)
       })
       .catch(() => {
-        if (!controller.signal.aborted) setCaps(null)
+        if (controller.signal.aborted) return
+        setCaps(null)
+        setCapsLoaded(true)
       })
     return () => controller.abort()
   }, [])
@@ -129,7 +135,7 @@ export default function SettingsPage() {
   const loginAtText = session
     ? new Date(session.loginAt).toLocaleString('zh-CN', { hour12: false })
     : '-'
-  const providerText = caps === null ? '无法读取' : caps.provider ?? '未配置'
+  const providerText = !capsLoaded ? '读取中…' : caps?.provider ?? '无法读取'
   const allNotifyOff = !prefs.pendingReminders && !prefs.overdueReminders && !prefs.progressDigest
 
   return (

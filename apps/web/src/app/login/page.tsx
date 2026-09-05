@@ -33,7 +33,12 @@ export default function LoginPage() {
       setError('账号或密码不正确')
       return
     }
-    writeDemoSession(account)
+    // 写入失败(如浏览器禁用本地存储)时留在登录页报错,避免登录/门卫来回弹跳
+    const session = writeDemoSession(account)
+    if (!session) {
+      setError('浏览器本地存储不可用，请允许站点存储后重试')
+      return
+    }
     router.replace('/')
   }
 

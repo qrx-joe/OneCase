@@ -9,11 +9,6 @@ export const CATEGORY_LABELS: Record<string, string> = {
   PARKING: '停车管理',
 }
 
-export function categoryLabel(code?: string | null): string {
-  if (!code) return '-'
-  return CATEGORY_LABELS[code] || code
-}
-
 /** 手动建案下拉用: 字典 + 「未分类」空选项 */
 export const CATEGORY_SELECT_OPTIONS: Array<{ code: string; label: string }> = [
   { code: '', label: '未分类' },
