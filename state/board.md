@@ -3,6 +3,20 @@
 > 用法：**倒序追加**，每轮一段。只记会影响后续行动的事：① 完成了什么 ② 作了什么决定、理由 ③ 下一步从哪接。
 > 给人看的版本在 `docs/devlog/`（按日期命名）。内容冲突时以代码与 adr 为准（权重见 CLAUDE.md「真相源权重」）。
 
+## 2026-09-06 · 早 · 复测 + 元反思：全绿二次确认；**发现并修复演示库污染**；勘误上段一处
+
+- 完成：① 全量复测二轮——单测 **213**（25/33/74/81）、typecheck 0 错、不变量 **99/99**、E2E **32/32**，与凌晨轮一致，两次独立复跑全绿。② 复测后直查 dev.db 发现 **14 cases / 33 intakes、KPI 10/3/9**——`test-confirm-invariants.mts` 的 finally 只清 other-community，**demo-org 测试夹具全部留在演示库**，末尾「Demo 基线恢复」消息失实；第二轮 reset 日志「删除 14/33」证实污染自凌晨轮复跑起一直存在。已 `db:reset` 恢复并逐项验证：**6/8、2/3/3、CASE-018 IN_PROGRESS**。③ 勘误：凌晨 4 段「演示库已被不变量脚本 reset 回 2/3/3 基线」**不成立**（未做终态核验，被脚本消息误导）——任何一次跑 `test:invariants` 之后，演示前必须显式 `db:reset`。④ 补查上轮缺口（均 P3）：.env.example 残留 NEXTAUTH_*/STORAGE_* 无对应实现；根 next.config.js 与根 .next 为残留；packages/ui 骨架包声明未用依赖。
+- 决定：不变量脚本污染问题记为复审报告 §6-1（P1 升级），修法三选一（独立临时库 / finally 补全清理 / 至少改警告文案+写入 07 T-60）留本轮之后拍板，本轮只恢复现场不改脚本。E2E 自身隔离经运行时复核成立（e2e-demo.db 独立、reset 守卫、server.mjs 强制 env），污染源不在 E2E。
+- 待确认：工作区两个非本会话创建的未跟踪文件 `docs/architecture/ARCHITECTURE_OVERVIEW.md`、`架构通俗版.md`（02:12 生成，内容与代码对齐，疑似并行会话架构文档轮）——归属请本人确认后再决定提交或移除。
+- 下一步从哪接：① 今晚演示前按 07 清单走（若中途跑过不变量脚本，T-60 必须含 db:reset + 验证 KPI 2/3/3）；② 复审报告 §三 P1/P2 按既定节奏处理；③ 真实模型冒烟与 PPT 二进制核对仍归本人。
+
+## 2026-09-06 · 凌晨 4 · 全仓复审（换谱系协议）：口径实测吻合，无 P0；报告落盘 docs/review/全仓复审-2026-09-06.md
+
+- 完成：四路并行审查（文档/packages/web/测试与CI）+ 全量实测复跑——单测 **213**（33/25/74/81）、不变量 **99/99**、E2E **32/32**、typecheck 全部实测通过（board 凌晨2段自承的「E2E 口径差 1 条」证实 32 为正确口径）。**业务代码无 P0**；2 个 P1：①不变量脚本实际 db:reset 演示库 dev.db 且 Mock 依赖环境缺省非强制（README「独立临时 SQLite、强制 Mock」口径失实；本会话实测 tsx 看不到 .env.local，跑的是 Mock、未外呼）；②演示材料 01/preliminary README 仍自称 200/29 为「最新实测口径」，与 213/32 冲突（材料轮既定事项）。P2 十条（demo-auth SecurityError 半修复、/api/cases take:20 铃铛统计失真、domain services 伪代码占位、ConfirmIssueDecisionSchema 假承诺、根 02 旧稿含姓名、TECH_SPEC/backlog 过时、walkthrough 178 行断言恒真等）+ P3 若干，全录在报告里。
+- 误报记录：测试审查代理静态清点出「208/31」报 P0，被实跑推翻——用例数以 vitest/playwright 实跑为准。
+- 未动任何代码与对外材料；演示库已被不变量脚本 reset 回 2/3/3 基线（其固有行为）。
+- 下一步从哪接：①演示前 10 分钟级修法（可选）：不变量脚本装配前强制 AI_PROVIDER=mock + walkthrough :178 改 `openRows>0`；②材料轮按既定计划刷 01/preliminary README/02-v2 至 213/32 并注「PPT P9 快照 200」；③P2/P3 按 backlog 节奏处理（报告 §三）。
+
 ## 2026-09-06 · 凌晨 3 · 演示前大巡检：全功能走查 24/24 + 备份演示视频成片 + 文档口径刷新
 
 - 完成：① UI 全功能走查脚本 `walkthrough-ui.mjs`（真实 StepFun 运行态，语义定位容忍模型输出差异）**24/24 通过**——门卫/登录对错/铃铛/来件/真实分析(2草稿)/查重候选/草稿编辑/关联+新建事务/详情来源+时间线/状态机/筛选/搜索/手动兜底/设置页/退出/二次拦截。② **备份演示视频成片** `docs/demo/video/OneCase-备份演示视频.mp4`（3.8 分钟 8.2MB，1440x900，edge-tts 配音 XiaoxiaoNeural + 烧录字幕，假光标跟随+拟人输入；Playwright 分段录制 → ffmpeg 逐段合成(配音响度标准化+SRT 按句铺时) → 拼接；管线入库 `record-demo-video.mjs`/`narration.json`/`gen-voice.py`/`compose.py`，配音稿按 cn-humanizer 口径去 AI 味，可整片或单段重录）。③ 文档口径刷新：06/07/08/DEMO_SCRIPT/README 数字 200/29 → **213/32**（2026-09-06 实测），07 加登录步骤/干净 Profile 红线/视频指引，08 加 Q21（虚拟登录安全性）/Q22（设置页非摆设），意外矩阵新增 `.next` 产物错乱一条。
