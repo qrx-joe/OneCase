@@ -47,7 +47,8 @@ AI Draft != Business Fact
 | 真实图片识别                           | Qwen/OpenAI/StepFun 图片消息已接通；当前 StepFun 图片 Intake 已真实完成分析并进入 Review，但没有代表性样本、准确率或稳定性结论 |
 | Mock 图片处理                          | 明确返回不能识别，不用固定结果冒充图片识别                                                                                     |
 | 语音                                   | 暂未支持，入口已禁用；可自行转写后粘贴文字                                                                                     |
-| 微信接入、Embedding 查重               | 尚未实现                                                                                                                       |
+| 消息渠道接入（飞书/钉钉/企业微信）     | **接入层已就绪**：入站 webhook + 按官方文档实现的签名校验/加解密（19 项契约测试）+ 未配置如实 503，见 ADR-004 与 `/api/integrations/status`；凭据未接入、**未与真实平台联调**。个人微信无官方接口。推送回群尚未实现 |
+| Embedding 查重                         | 尚未实现（当前为标题/地点/类别启发式）                                                                                         |
 
 2026-09-05 运行态检查为 `stepfun / step-1o-turbo-vision`；一条合成图片 Intake 的分析审计为 `COMPLETED`，耗时 3449 ms，并生成 1 个待人工决策草稿。该证据只证明链路运行，不证明识别质量。`/api/intakes/capabilities` 只检查本地装配，不调用模型；当前 `imageProviderConfigured` 仅按“非 Mock”判断，尚不能严格证明所选模型支持视觉。
 

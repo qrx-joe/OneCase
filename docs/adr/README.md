@@ -33,6 +33,7 @@
 | [001](001-modular-monolith.md) | Modular Monolith 工程边界 | Accepted |
 | [002](002-mock-provider-first.md) | MockProvider First,后接真实 AI | Accepted |
 | [003](003-sqlite-postgresql-timing.md) | SQLite→PostgreSQL 迁移时机——参赛阶段不迁移 | Accepted |
+| [004](004-channel-integration-layer.md) | 消息渠道接入层——飞书/钉钉/企业微信入站 webhook | Accepted |
 
 ---
 

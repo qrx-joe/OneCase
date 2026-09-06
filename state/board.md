@@ -3,6 +3,14 @@
 > 用法：**倒序追加**，每轮一段。只记会影响后续行动的事：① 完成了什么 ② 作了什么决定、理由 ③ 下一步从哪接。
 > 给人看的版本在 `docs/devlog/`（按日期命名）。内容冲突时以代码与 adr 为准（权重见 CLAUDE.md「真相源权重」）。
 
+## 2026-09-06 · 上午 2 · 消息渠道接入层落地（飞书/钉钉/企业微信入站 webhook，ADR-004）
+
+- 完成：本人指示「可接飞书、微信、钉钉等接口」，按预设深度问题未答复→取推荐项「就绪层先行、演示链路零改动」。落地 `src/lib/integrations/`（纯函数适配器：飞书 token 比对+AES 加密订阅、钉钉 HMAC-SHA256 回调签名+时间戳窗、企微 msg_signature SHA1+AES-256-CBC+receiveid 校验）+ `POST|GET /api/integrations/[platform]/webhook` + `GET /api/integrations/status`（只报就绪态不回读密钥）。建件复用 `/api/intakes` 契约（幂等键 `platform:msgId`，平台重推天然去重，sourceType 记平台名）；非文本/机器人自身消息明确 ignore 并回原因。ADR-004 + adr 索引 + .env.example + README 功能表已同步。
+- 验证：**19 项离线契约测试**（对称加解密/签名正反例/路由接线，含企微 corpId 位置修正与飞书 IV 约定修正两个开发期抓错）；全量回归 **单测 232**（contracts 25 / domain 33 / ai 74 / web 100，213+19）/ typecheck / **E2E 32/32** 全绿；演示库 KPI 维持 2/3/3（cases 6）。
+- 边界（对外必须如实说）：**未与真实平台联调**——契约测试证明实现符合公开文档算法，凭据接入后须先跑一次真实消息冒烟；仅入站文本；**个人微信无官方接口**；推送回群（outbound）未实现进 backlog。
+- 数字口径：单测实测 213 → **232**（材料轮答辩口径沿用「PPT P9 快照 200，代码实测 232（213+接入层 19）」）。
+- 下一步从哪接：① 本人在飞书/钉钉开放平台建自建应用拿凭据（env 变量名见 .env.example），配好后先发一条真实群消息冒烟；② 设置页「集成与通知渠道」状态行（读 status 接口）留下一轮，当前占位未动；③ outbound 推通知与 Review 页对 webhook 来源 Intake 的展示（sourceType 徽标）在 backlog。
+
 ## 2026-09-06 · 上午 · 不变量脚本演示库污染根治修复（独立临时库+强制 Mock，99/99 实测，dev.db 零触碰）
 
 - 完成：① 落地复审报告 §6-1 的根治方案——新增 `apps/web/scripts/invariants-env.ts` 作为 `test-confirm-invariants.mts` 的**第一个 import**（ESM 求值顺序保证 PrismaClient 实例化前 env 就位）：DATABASE_URL 指向独立临时库 `invariants-temp.db`（启动删旧文件含 journal → `prisma db push` 建表 → `db:reset` seed），AI_PROVIDER 强制 mock。脚本头部注释、finally 消息（「临时库自清理完成；演示库 dev.db 全程未被触碰」）、.gitignore、CLAUDE.md 意外矩阵同步。② 验证：**99/99 通过**、日志确认运行在 `file:./invariants-temp.db`、运行前后 dev.db mtime 毫秒级一致、KPI 维持 2/3/3；typecheck 干净。README「独立临时 SQLite、强制 Mock」口径自此为真；07 手册无需加 T-60 重置步骤。
