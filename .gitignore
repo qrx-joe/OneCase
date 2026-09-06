@@ -14,6 +14,7 @@ coverage
 *.tsbuildinfo
 packages/db/prisma/dev.db
 packages/db/prisma/e2e-demo.db
+packages/db/prisma/invariants-temp.db
 packages/db/prisma/*.db-journal
 # Playwright 运行产物
 apps/web/test-results

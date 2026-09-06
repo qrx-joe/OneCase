@@ -3,7 +3,13 @@
 > 用法：**倒序追加**，每轮一段。只记会影响后续行动的事：① 完成了什么 ② 作了什么决定、理由 ③ 下一步从哪接。
 > 给人看的版本在 `docs/devlog/`（按日期命名）。内容冲突时以代码与 adr 为准（权重见 CLAUDE.md「真相源权重」）。
 
-## 2026-09-06 · 早 · 复测 + 元反思：全绿二次确认；**发现并修复演示库污染**；勘误上段一处
+## 2026-09-06 · 上午 · 不变量脚本演示库污染根治修复（独立临时库+强制 Mock，99/99 实测，dev.db 零触碰）
+
+- 完成：① 落地复审报告 §6-1 的根治方案——新增 `apps/web/scripts/invariants-env.ts` 作为 `test-confirm-invariants.mts` 的**第一个 import**（ESM 求值顺序保证 PrismaClient 实例化前 env 就位）：DATABASE_URL 指向独立临时库 `invariants-temp.db`（启动删旧文件含 journal → `prisma db push` 建表 → `db:reset` seed），AI_PROVIDER 强制 mock。脚本头部注释、finally 消息（「临时库自清理完成；演示库 dev.db 全程未被触碰」）、.gitignore、CLAUDE.md 意外矩阵同步。② 验证：**99/99 通过**、日志确认运行在 `file:./invariants-temp.db`、运行前后 dev.db mtime 毫秒级一致、KPI 维持 2/3/3；typecheck 干净。README「独立临时 SQLite、强制 Mock」口径自此为真；07 手册无需加 T-60 重置步骤。
+- 注意：验证时发现 dev.db 有 2 条**非本会话**写入的 intake（09:31-09:32 经 :3000 手动创建，「3栋2单元的灯坏了」等，疑本人/并行会话实测）——未清理，不影响 KPI（cases 口径 2/3/3 不变）；如需回 seed 基线跑一次 db:reset 即可。
+- 下一步从哪接：① 本人在路演机跑一次 `pnpm --filter @onecase/web test:invariants` 冒烟确认临时库行为（可选）；② 复审报告其余 P1（材料数字 213/32 刷新）与 P2/P3 按既定节奏处理。
+
+
 
 - 完成：① 全量复测二轮——单测 **213**（25/33/74/81）、typecheck 0 错、不变量 **99/99**、E2E **32/32**，与凌晨轮一致，两次独立复跑全绿。② 复测后直查 dev.db 发现 **14 cases / 33 intakes、KPI 10/3/9**——`test-confirm-invariants.mts` 的 finally 只清 other-community，**demo-org 测试夹具全部留在演示库**，末尾「Demo 基线恢复」消息失实；第二轮 reset 日志「删除 14/33」证实污染自凌晨轮复跑起一直存在。已 `db:reset` 恢复并逐项验证：**6/8、2/3/3、CASE-018 IN_PROGRESS**。③ 勘误：凌晨 4 段「演示库已被不变量脚本 reset 回 2/3/3 基线」**不成立**（未做终态核验，被脚本消息误导）——任何一次跑 `test:invariants` 之后，演示前必须显式 `db:reset`。④ 补查上轮缺口（均 P3）：.env.example 残留 NEXTAUTH_*/STORAGE_* 无对应实现；根 next.config.js 与根 .next 为残留；packages/ui 骨架包声明未用依赖。
 - 决定：不变量脚本污染问题记为复审报告 §6-1（P1 升级），修法三选一（独立临时库 / finally 补全清理 / 至少改警告文案+写入 07 T-60）留本轮之后拍板，本轮只恢复现场不改脚本。E2E 自身隔离经运行时复核成立（e2e-demo.db 独立、reset 守卫、server.mjs 强制 env），污染源不在 E2E。

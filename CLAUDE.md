@@ -43,7 +43,7 @@
 |---|---|
 | 改 lib 文件后热重载 500 / webpack 缓存损坏 | 重启 `pnpm dev` 即恢复；`next build` 与运行中的 dev 共写 `.next`，build 之后重启 dev |
 | 页面渲染但无样式、JS 资源 404、前端功能全部失效（含跳转/事件） | 是 `.next` 产物错乱、页面脚本根本没加载（2026-09-06 实测踩坑，易误判为新代码 bug）：先 `netstat -ano` 找 3000 端口 PID 杀净，`rm -rf apps/web/.next` 再起 dev；演示日 T-60 清单含"确认首页有样式" |
-| E2E 失败且怀疑数据污染 | Playwright 用例会自动 db:reset；手跑 `apps/web/scripts/*.mjs` 前先 `pnpm --filter @onecase/db db:reset`（会清业务数据，仅限演示库） |
+| E2E 失败且怀疑数据污染 | Playwright 用例会自动 db:reset；手跑 `apps/web/scripts/*.mjs` 前先 `pnpm --filter @onecase/db db:reset`（会清业务数据，仅限演示库）；`test:invariants` 不变量脚本自用独立临时库，不碰演示库（2026-09-06 起，2026-09-06 之前它会把测试夹具留在 dev.db） |
 | 确认接口返回 `INTAKE_ALREADY_CONFIRMED` | 幂等保护生效，不要重试确认；先查 intake 状态再决定下一步 |
 | AI Provider 调用失败 | 不自动降级 mock（仅 `DEMO_MODE=true` 且 `AI_ALLOW_MOCK_FALLBACK=true` 才允许）；引导走手动创建 Case 的兜底路径 |
 | 本地与 CI 行为不一致 | 先对版本：本地 Node 24 / CI Node 22、pnpm 10（`.nvmrc` 锁 22）；再怀疑代码 |

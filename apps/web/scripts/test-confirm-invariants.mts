@@ -1,7 +1,8 @@
 // Confirm/手动兜底 业务不变量集成测试 (整改简报 §3/§4/§7 + codex 复审 P1-2)
-// 直接调用服务层 + 真实 SQLite,构造 HTTP 无法构造的状态 (FAILED Analysis / 跨组织数据)
+// 直接调用服务层 + 独立临时 SQLite,构造 HTTP 无法构造的状态 (FAILED Analysis / 跨组织数据)
 // 运行: pnpm --filter @onecase/web test:invariants
-// (脚本自带 db:reset,不需要 dev server)
+// (运行环境见 invariants-env.ts,须保持为第一个 import: 独立临时库 + 强制 Mock,不需要 dev server,不触碰演示库)
+import { INVARIANTS_DATABASE_URL } from './invariants-env'
 import { execSync } from 'child_process'
 import { NextRequest } from 'next/server'
 import { prisma } from '@onecase/db'
@@ -285,8 +286,11 @@ async function createAnalyzedIntake(rawText: string) {
 
 async function main() {
   console.log('🧪 Confirm/手动兜底业务不变量\n')
-  execSync('pnpm --filter @onecase/db db:reset', { stdio: 'inherit' })
-  // db:reset 不清 Organization: 先清掉历史运行遗留的 other-community,恢复 Demo 基线
+  const childEnv = { ...process.env, DATABASE_URL: INVARIANTS_DATABASE_URL }
+  // 独立临时库: 建表 + 重置并 seed (库文件在 invariants-env.ts 已清空重建,与演示库 dev.db 无关)
+  execSync('pnpm --filter @onecase/db exec prisma db push --skip-generate', { stdio: 'inherit', env: childEnv })
+  execSync('pnpm --filter @onecase/db db:reset', { stdio: 'inherit', env: childEnv })
+  // db:reset 不清 Organization: 先清掉历史运行遗留的 other-community
   await cleanupOtherCommunity()
 
   try {
@@ -696,14 +700,14 @@ async function main() {
   await checkIntakeBoundaries()
   console.log(`\n业务不变量: ${checked - failed}/${checked} 项通过`)
   } finally {
-    // 测试自清理: 不把跨组织数据留在 Demo 基线 (codex P2-4)
+    // 测试自清理: 临时库随本次运行废弃,不把跨组织数据遗留到下一次运行 (codex P2-4)
     await cleanupOtherCommunity()
     const leftover = await prisma.organization.findUnique({ where: { slug: 'other-community' } })
     if (leftover) {
       failed++
-      console.log('  ❌ other-community 清理失败,Demo 基线被污染')
+      console.log('  ❌ other-community 清理失败,临时库被污染')
     } else {
-      console.log('  🧹 other-community 已清理,Demo 基线恢复 (仅 demo-community)')
+      console.log('  🧹 临时库自清理完成;演示库 dev.db 全程未被触碰')
     }
     await prisma.$disconnect()
   }
