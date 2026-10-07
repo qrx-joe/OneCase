@@ -44,6 +44,9 @@ jobs:
       - name: Business invariant tests
         run: pnpm test:invariants
 
+      - name: SQLite concurrency tests (independent processes)
+        run: pnpm test:concurrency
+
       - name: Build (all packages)
         run: pnpm -r build
 

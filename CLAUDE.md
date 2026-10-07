@@ -49,7 +49,7 @@
 | 本地与 CI 行为不一致 | 先对版本：本地 Node 24 / CI Node 22、pnpm 10（`.nvmrc` 锁 22）；再怀疑代码 |
 | pnpm install 拉不下包 | 依次试：默认源 → npmmirror 镜像 → 原样报告失败。不静默换方案、不降级需求 |
 | 状态迁移被拒 | `packages/domain` 状态机是唯一校验源，UI 下拉与 API 同源；不要在 API 层加第二套规则 |
-| Case 编号疑似重复 | `count()+1` 并发重号是 README 已记录的已知限制，不是新 bug，别顺手修（留给专门决策） |
+| Case 编号疑似重复 | 当前使用 `CaseNumberSequence` 原子分配；先确认数据库已 `db:push`，再跑 `pnpm test:concurrency` 检查真实 SQLite 四进程回归（2026-10-07 修复记录在 devlog） |
 
 ## 纪律（每次提交前自查）
 

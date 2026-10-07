@@ -17,7 +17,11 @@ export function createEvaluationFetch(
     const response = await transport(input, { ...init, body: JSON.stringify(body) })
     // 不另行读取响应副本；保持生产 Provider 的正文超时保护。
     const readJson = response.json.bind(response)
-    response.json = async () => { const value = await readJson(); onResponse(value); return value }
+    Object.defineProperty(response, 'json', {
+      configurable: true,
+      writable: true,
+      value: async () => { const value = await readJson(); onResponse(value); return value },
+    })
     return response
   }
   return { fetch: guarded, get requests() { return requests } }

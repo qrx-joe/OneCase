@@ -126,6 +126,9 @@ node apps/web/scripts/test-manual-create.mjs  # 手动创建 Case (AI 失败兜�
 # 不复用已有服务；仅重置固定的 E2E 测试库
 pnpm --filter @onecase/web test:e2e
 
+# 实际 SQLite 并发回归（四个独立进程、独立临时库、无模型外呼）
+pnpm test:concurrency
+
 pnpm --filter @onecase/web build     # 构建验证
 ```
 
@@ -136,6 +139,10 @@ pnpm --filter @onecase/web build     # 构建验证
 2026-09-06 深夜全量复跑：单测 **213**（domain 33 / contracts 25 / ai 74 / web 81）、业务不变量 **99/99**、Playwright E2E **32/32**（含演示登录 setup 与设置页用例）、web typecheck 与 `next build` 通过。新增演示虚拟登录（`/login` + 前端会话门卫）与设置页（`/settings`），类别文案字典提取为 `lib/category-labels.ts` 单一来源；UI 全功能走查 24/24 通过（真实 StepFun 运行态，脚本 `apps/web/scripts/walkthrough-ui.mjs`）。
 
 **CI**: GitHub Actions (`.github/workflows/ci.yml`) 在每次 push/PR 上自动跑 typecheck、单测（含 20 条合成 Eval）、全仓 build 与 Playwright E2E。
+
+2026-10-07 并发与构建修复：状态更新先判断版本，过期请求返回 409；新建与确认共用 SQLite 原子编号序列，保留历史编号并避免删除后重号；确认结果只在事务提交后返回。文字保存使用单次原子写入，修复旧版 CI 中同幂等键并发请求的事务超时；AI 响应与评估包装的两处类型错误已修复。实际 SQLite 四进程回归 **12/12**、单测 **244/244**、业务不变量 **99/99**、Playwright **32/32**、typecheck 与**全仓 build**通过，详见 [本轮记录](docs/devlog/CONCURRENCY_FIX_2026-10-07.md)。并发回归已加入 CI 配置，远程结果以对应提交的 [GitHub Actions](https://github.com/qrx-joe/OneCase/actions/workflows/ci.yml) 为准。项目尚未发布网站。
+
+已有数据库升级此版本前需运行 `pnpm --filter @onecase/db db:push` 与 `pnpm --filter @onecase/db db:generate`，新增 `CaseNumberSequence` 表，不重建业务数据。序列首次分配从当前最大合法 `CASE-N` 编号与 1000 中的较大值开始；已有编号不改写。删除已分配事项不会回退水位，失败事务同时回滚编号分配。当前本地 `dev.db` 已备份并完成新增表升级。
 
 **Eval**: `packages/ai/__tests__/eval.test.ts` 仅对 Mock 基线跑 20 条合成用例（100% 通过 = 可执行规格），指定真实 Provider 会报错。真实 StepFun 评估使用独立的 20 条文字、10 张合成图片事实样本：`pnpm --filter @onecase/web eval:quality` 默认只生成样本、不调用模型；获准后显式指定 `--run` 与请求上限，见 [真实模型评估说明](docs/testing/real-model-quality.md)。
 
@@ -195,7 +202,6 @@ docs/
 ## 已知限制 (试点前需补)
 
 - 后端鉴权未实现：当前仅有**演示虚拟登录**（固定账号、纯前端本机会话，无权限校验）；真实认证/RBAC/租户硬隔离在试点前置清单最前
-- Case 编号 `count()+1` 并发可重号 → 改序列
 - Embedding 重复检测未接 (当前为标题/地点/类别启发式)
 - 图片识别仍需代表性样本、准确率、稳定性和现场失败演练；语音录音和转写尚未接入
 - 图片目前以 data URL 存入 SQLite，仅适合小规模演示；生产存储与权限仍需设计

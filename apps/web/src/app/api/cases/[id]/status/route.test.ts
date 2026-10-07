@@ -148,6 +148,25 @@ describe('POST /api/cases/[id]/status (R1 乐观锁落实到写入)', () => {
     expect(stub.calls.caseActionCreate).toHaveLength(0)
   })
 
+  it('其他请求已变更状态: 过期版本优先返回 409,不误报非法迁移', async () => {
+    stub = createPrismaStub({ status: 'CANCELED', version: 2 })
+    holder.prisma = stub.prisma
+    const { status, data } = await postStatus(1, 'IN_PROGRESS')
+
+    expect(status).toBe(409)
+    expect(data).toMatchObject({ error: 'CASE_VERSION_CONFLICT', currentVersion: 2 })
+    expect(stub.calls.updateMany).toHaveLength(0)
+    expect(stub.calls.caseActionCreate).toHaveLength(0)
+  })
+
+  it.each([-1, 1.5, Number.MAX_SAFE_INTEGER + 1])('非法版本 %s → 400,不写入', async (version) => {
+    const { status, data } = await postStatus(version, 'IN_PROGRESS')
+    expect(status).toBe(400)
+    expect(data.error).toBe('INVALID_REQUEST')
+    expect(stub.calls.updateMany).toHaveLength(0)
+    expect(stub.calls.caseActionCreate).toHaveLength(0)
+  })
+
   it('事项不存在 → 404', async () => {
     stub.tx.case.findFirst.mockResolvedValue(null)
 

@@ -66,6 +66,24 @@ describe('OpenAIProvider (Mocked)', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
+  it.each([
+    null,
+    'invalid envelope',
+    { choices: null },
+    { choices: { 0: { message: { content: VALID_CONTENT } } } },
+    { choices: [null] },
+    { choices: [{ message: null }] },
+    { choices: [{ message: { content: 123 } }] },
+  ])('未知响应结构 %j 应返回 ProviderError', async (body) => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(body)))
+    global.fetch = fetchMock as typeof fetch
+
+    await expect(provider.extractCaseDraft({ rawText: '合成测试' })).rejects.toMatchObject({
+      name: 'ProviderError', message: 'AI response has no content', retryable: true,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('500 应该重试', async () => {
     const retryProvider = new OpenAIProvider('test-api-key', 'gpt-4o', {
       timeoutMs: 500,

@@ -135,6 +135,12 @@ model IntakeIssue {
 // Case (已确认事项)
 // ============================================================
 
+// 全局持久编号水位;与 Case 创建在同一事务内分配,删除 Case 不回退。
+model CaseNumberSequence {
+  id    String @id
+  value Int
+}
+
 model Case {
   id              String   @id @default(cuid())
   organizationId  String

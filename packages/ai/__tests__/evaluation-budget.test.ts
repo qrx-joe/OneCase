@@ -32,3 +32,23 @@ it('不接受其他端点和非法限额', async () => {
   expect(transport).not.toHaveBeenCalled()
   for (const limit of [0, -1, 31, 1.5, NaN]) expect(() => createEvaluationFetch(transport, limit, () => {}, () => {})).toThrow()
 })
+it('装饰原响应,仅在正文读取完成后审计,不复制或预读正文', async () => {
+  const original = new Response(JSON.stringify({ usage: { total_tokens: 12 } }), {
+    status: 201, headers: { 'X-Test': 'synthetic' },
+  })
+  const clone = vi.spyOn(original, 'clone')
+  const onResponse = vi.fn()
+  const budget = createEvaluationFetch(vi.fn().mockResolvedValue(original), 1, onResponse, () => {})
+  const response = await budget.fetch(url, request)
+  expect(response).toBe(original)
+  expect(response.status).toBe(201)
+  expect(response.headers.get('X-Test')).toBe('synthetic')
+  expect(response.bodyUsed).toBe(false)
+  expect(onResponse).not.toHaveBeenCalled()
+  expect(clone).not.toHaveBeenCalled()
+  await expect(response.json()).resolves.toEqual({ usage: { total_tokens: 12 } })
+  expect(response.bodyUsed).toBe(true)
+  expect(onResponse).toHaveBeenCalledTimes(1)
+  await expect(response.json()).rejects.toThrow()
+  expect(onResponse).toHaveBeenCalledTimes(1)
+})

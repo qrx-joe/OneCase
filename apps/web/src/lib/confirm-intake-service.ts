@@ -61,7 +61,13 @@ export async function confirmIntake(params: ConfirmIntakeParams): Promise<Confir
   }
 
   try {
-    await prisma.$transaction(async (tx) => {
+    const committed = await prisma.$transaction(async (tx) => {
+      // 事务可能在任意写入或提交时失败;只在提交成功后向调用方发布结果。
+      const pending: Pick<ConfirmIntakeResult, 'createdCases' | 'linkedCases' | 'disposedIssues'> = {
+        createdCases: [],
+        linkedCases: [],
+        disposedIssues: [],
+      }
       // 1. 校验 Intake
       const intake = await tx.intake.findUnique({
         where: { id: intakeId },
@@ -258,7 +264,7 @@ export async function confirmIntake(params: ConfirmIntakeParams): Promise<Confir
             },
           })
 
-          result.createdCases.push({
+          pending.createdCases.push({
             id: newCase.id,
             caseNumber: newCase.caseNumber,
           })
@@ -320,7 +326,7 @@ export async function confirmIntake(params: ConfirmIntakeParams): Promise<Confir
             },
           })
 
-          result.linkedCases.push({
+          pending.linkedCases.push({
             caseId: targetCase.id,
             caseNumber: targetCase.caseNumber,
           })
@@ -340,7 +346,7 @@ export async function confirmIntake(params: ConfirmIntakeParams): Promise<Confir
               dispositionNote: decision.dispositionNote?.trim() || undefined,
             },
           })
-          result.disposedIssues.push({
+          pending.disposedIssues.push({
             issueIndex: decision.issueIndex,
             disposition: decision.disposition as IssueDisposition,
           })
@@ -353,8 +359,9 @@ export async function confirmIntake(params: ConfirmIntakeParams): Promise<Confir
         data: { status: 'CONFIRMED' },
       })
 
-      result.success = true
+      return pending
     })
+    Object.assign(result, committed, { success: true })
   } catch (error) {
     console.error('Confirm intake failed:', error)
     result.errors.push(error instanceof Error ? error.message : 'Unknown error')

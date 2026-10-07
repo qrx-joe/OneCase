@@ -139,9 +139,7 @@ async function attemptOnce(req: OpenAICompatibleRequest): Promise<ExtractionResu
       })
     }
 
-    let data: {
-      choices?: Array<{ message?: { content?: string } }>
-    } | null
+    let data: unknown
     try {
       data = await res.json()
     } catch (e) {
@@ -154,7 +152,7 @@ async function attemptOnce(req: OpenAICompatibleRequest): Promise<ExtractionResu
       }
       throw new ProviderError('AI response is not valid JSON', { retryable: true })
     }
-    const content = data?.choices?.[0]?.message?.content
+    const content = getMessageContent(data)
 
     if (typeof content !== 'string' || !content.trim()) {
       throw new ProviderError('AI response has no content', { retryable: true })
@@ -200,6 +198,18 @@ async function attemptOnce(req: OpenAICompatibleRequest): Promise<ExtractionResu
 
 function isAbortError(e: unknown): boolean {
   return e instanceof Error && e.name === 'AbortError'
+}
+
+function getMessageContent(data: unknown): unknown {
+  if (!data || typeof data !== 'object' || !('choices' in data) || !Array.isArray(data.choices)) {
+    return undefined
+  }
+  const choice: unknown = data.choices[0]
+  if (!choice || typeof choice !== 'object' || !('message' in choice)) return undefined
+  const message = choice.message
+  return message && typeof message === 'object' && 'content' in message
+    ? message.content
+    : undefined
 }
 
 function describeBodyReadError(e: unknown, controller: AbortController): string {

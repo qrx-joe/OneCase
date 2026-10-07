@@ -43,9 +43,9 @@ export async function POST(
       )
     }
 
-    if (typeof expectedVersion !== 'number') {
+    if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 0) {
       return NextResponse.json(
-        { error: 'INVALID_REQUEST', message: 'expectedVersion (number) is required' },
+        { error: 'INVALID_REQUEST', message: 'expectedVersion (non-negative integer) is required' },
         { status: 400 }
       )
     }
@@ -58,6 +58,12 @@ export async function POST(
 
       if (!caseData) {
         return { kind: 'NOT_FOUND' }
+      }
+
+      // 先判断版本: 竞争者可能已经改变状态,过期请求应返回 409 引导刷新,
+      // 不能用新状态拒绝客户端基于旧版本作出的合法决策 (422)。
+      if (caseData.version !== expectedVersion) {
+        return { kind: 'VERSION_CONFLICT', currentVersion: caseData.version }
       }
 
       // ---- 状态机校验 (Domain 规则) ----

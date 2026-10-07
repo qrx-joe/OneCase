@@ -51,13 +51,17 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const intake = await prisma.$transaction(async (tx) => {
-        const created = await tx.intake.create({
-          data: { organizationId: orgId, sourceType, rawText, idempotencyKey, status: 'PENDING' },
-        })
-        if (attachment) await tx.attachment.create({ data: { ...attachment, intakeId: created.id } })
-        return created
-      })
+      const intakeData = { organizationId: orgId, sourceType, rawText, idempotencyKey, status: 'PENDING' }
+      // 文字只有一次写入,直接使用原子 INSERT 与唯一约束。
+      // 避免并发 BEGIN IMMEDIATE 等锁阻塞交互事务回调,使首个事务过期。
+      // 图片的 Intake/Attachment 仍必须同事务提交,不留下半条上传记录。
+      const intake = attachment
+        ? await prisma.$transaction(async (tx) => {
+            const created = await tx.intake.create({ data: intakeData })
+            await tx.attachment.create({ data: { ...attachment, intakeId: created.id } })
+            return created
+          })
+        : await prisma.intake.create({ data: intakeData })
       return NextResponse.json({ data: intake })
     } catch (error) {
       if (idempotencyKey && error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
