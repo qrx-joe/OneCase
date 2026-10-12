@@ -60,6 +60,7 @@ function createPrismaStub(initial: { status: string; version: number }) {
       ),
     },
     caseAction: {
+      findFirst: vi.fn(async () => null),
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
         calls.caseActionCreate.push(data)
         return data

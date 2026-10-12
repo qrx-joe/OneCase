@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:e2e": "node tests/e2e/server.mjs",
+    "dev:livelihood": "node scripts/start-livelihood-demo.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

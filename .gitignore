@@ -2,6 +2,8 @@ node_modules
 .next
 .next-e2e
 .tsconfig.e2e.json
+.next-livelihood-demo
+.tsconfig.livelihood-demo.json
 out
 dist
 *.log
@@ -34,3 +36,7 @@ docs/competition/preliminary-2026/projects/*/analysis/
 
 # E2E 登录会话状态 (playwright storageState,由 auth.setup 生成)
 apps/web/tests/e2e/.auth/
+
+# 参考区：别人的材料，可重建，不进仓
+resources/**
+!resources/README.md

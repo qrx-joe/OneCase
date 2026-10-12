@@ -9,6 +9,8 @@
 | 文件 | 对应任务 | 用途 |
 |---|---|---|
 | [interview-outline.md](./interview-outline.md) | S0-T1 | 访谈提纲（14 题，含语音必答题），打印带去现场 |
+| [民生服务扩展方案](../product/livelihood-service-expansion.md) / [合成任务卡](../testing/usability/livelihood-scenario-cards.md) | 就业/养老流程核对 | 两条候选服务链路、12 项验收标准、10 张纸面走查卡；设计已编写，一线走查未执行，不证明当前应用支持完整服务流程 |
+| [民生流程走查执行说明](../testing/usability/livelihood-walkthrough-runbook.md) / [可打印材料](../testing/usability/livelihood-walkthrough-kit.pdf) | B-12 一线准备 | 约 40 分钟的主持流程、6 项核心任务与 3 项选用任务、匿名记录和取舍表；参与者题目与核对要点分开，一线结果未执行 |
 | [consent-and-anonymization.md](./consent-and-anonymization.md) | 全程 | 知情同意书（一页纸）+ 脱敏操作规则 |
 | [time-baseline-template.md](./time-baseline-template.md) | S0-T2 | 流程计时表，现场填 |
 | [ledger-collection-checklist.md](./ledger-collection-checklist.md) | S0-T3 | 样表收集清单 + 地点叫法记录模板 |
@@ -39,3 +41,11 @@
 2. 不在公开场合投影任何含真实居民信息的屏幕。
 3. 参与人身份信息不进仓库：用编号 P1-P5，单位写"某社区"即可。
 4. 对方不愿回答的问题直接跳过，语音必答题（E）除外——那是立项判据。
+
+## 暂无一线参与者时的公开项目研究
+
+可先通过公开源码和实施文档补设计依据；实际工作负担、采用意愿和本地服务效果仍待验证。本项不代替上方现场研究的结果。
+
+| 资料 | 日期 | 用途 |
+|---|---|---|
+| [民生服务开源参考地图](./001_livelihood-open-source/README.md) | 2026-10-09 | GitHub、GitLab、Gitee、GitCode 等项目的固定证据、许可、差距和下一步取舍 |

@@ -4,6 +4,7 @@ import { confirmIntake } from '@/lib/confirm-intake-service'
 
 // 服务层校验失败码 → 422 (客户端请求问题,不是服务器故障)
 const CONFIRM_VALIDATION_CODES = [
+  'PERSONAL_SERVICE_REQUIRES_SUBJECT_REVIEW',
   'INTAKE_NOT_READY_FOR_CONFIRM',
   'ANALYSIS_NOT_COMPLETED',
   'ANALYSIS_ISSUES_EMPTY',

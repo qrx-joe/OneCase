@@ -4,6 +4,7 @@
 // 注意: 未校准 heuristic,仅用于候选排序,不自动合并
 import { prisma } from '@/lib/prisma'
 import { resolveOrgId } from '@/lib/demo-context'
+import { SERVICE_RECORD_ACTION } from './service-record'
 import {
   calculateStringSimilarity,
   tokenSimilarity,
@@ -58,12 +59,17 @@ export async function findDuplicates(params: FindDuplicatesParams): Promise<Dupl
   // 解析组织 (demo-org 别名 → seed 组织真实 cuid)
   const orgId = await resolveOrgId(organizationId)
 
+  // 个人服务尚无来自草稿的已核实对象信息，禁止进入公共事项的文字/地点候选池。
+  const personal = await prisma.caseAction.findMany({
+    where: { action: SERVICE_RECORD_ACTION }, select: { caseId: true }, distinct: ['caseId'],
+  })
+
   // 1. 拉取同组织、未关闭的候选池 (不限定类别,让 Hard Negative 也能出现)
   const candidates = await prisma.case.findMany({
     where: {
       organizationId: orgId,
       status: { notIn: ['CLOSED', 'CANCELED'] },
-      ...(excludeCaseId ? { id: { not: excludeCaseId } } : {}),
+      id: { notIn: [...personal.map(p => p.caseId), ...(excludeCaseId ? [excludeCaseId] : [])] },
     },
     orderBy: { createdAt: 'desc' },
     take: 50, // 候选池上限,MVP 规模足够

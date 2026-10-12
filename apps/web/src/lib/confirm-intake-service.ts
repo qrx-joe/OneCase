@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma'
 import { calculatePriority } from '@onecase/domain'
 import { ISSUE_DISPOSITIONS, type IssueDisposition } from '@onecase/contracts'
 import { generateCaseNumber } from '@/lib/case-number'
+import { SERVICE_RECORD_ACTION } from './service-record'
 
 export interface ConfirmIntakeParams {
   intakeId: string
@@ -292,6 +293,11 @@ export async function confirmIntake(params: ConfirmIntakeParams): Promise<Confir
           if (targetCase.organizationId !== intake.organizationId) {
             throw new Error('TARGET_CASE_ORG_MISMATCH')
           }
+
+          const personalService = await tx.caseAction.findFirst({
+            where: { caseId: targetCase.id, action: SERVICE_RECORD_ACTION },
+          })
+          if (personalService) throw new Error('PERSONAL_SERVICE_REQUIRES_SUBJECT_REVIEW')
 
           // 检查是否已关联 (唯一约束)
           const existing = await tx.caseSource.findUnique({

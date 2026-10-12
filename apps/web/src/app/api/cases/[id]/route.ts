@@ -95,6 +95,8 @@ function formatActionTitle(action: string): string {
   switch (action) {
     case 'STATUS_CHANGE':
       return '状态变更'
+    case 'SERVICE_RECORD':
+      return '服务跟进记录'
     case 'ASSIGN':
       return '负责人调整'
     case 'PRIORITY_CHANGE':

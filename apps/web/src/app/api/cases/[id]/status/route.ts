@@ -5,6 +5,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { validateStatusTransition, CASE_STATUS_TRANSITIONS, CaseStatus } from '@onecase/domain'
+import { readServiceRecord } from '@/lib/service-case-service'
+import { serviceClosingError } from '@/lib/service-record'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,6 +14,7 @@ type StatusUpdateOutcome =
   | { kind: 'OK'; caseData: { id: string; caseNumber: string }; fromStatus: string; version: number }
   | { kind: 'NOT_FOUND' }
   | { kind: 'ILLEGAL_TRANSITION'; currentStatus: string; message: string }
+  | { kind: 'SERVICE_NOT_READY'; message: string }
   | { kind: 'VERSION_CONFLICT'; currentVersion: number }
 
 export async function POST(
@@ -80,6 +83,12 @@ export async function POST(
       }
 
       // ---- Optimistic Lock: id + version 条件更新 ----
+      if (['RESOLVED', 'CLOSED', 'CANCELED'].includes(newStatus)) {
+        const service = await readServiceRecord(tx, caseData.id)
+        const reason = service && serviceClosingError(service, newStatus)
+        if (reason) return { kind: 'SERVICE_NOT_READY', message: reason }
+      }
+
       // version 单调递增,匹配 expectedVersion 等价于"自我读取以来无人写入";
       // 影响 0 行说明并发请求已抢占,本请求放弃写入。
       const claimed = await tx.case.updateMany({
@@ -118,6 +127,8 @@ export async function POST(
     })
 
     switch (outcome.kind) {
+      case 'SERVICE_NOT_READY':
+        return NextResponse.json({ error: 'SERVICE_NOT_READY_TO_CLOSE', message: outcome.message }, { status: 422 })
       case 'NOT_FOUND':
         return NextResponse.json({ error: 'CASE_NOT_FOUND' }, { status: 404 })
 

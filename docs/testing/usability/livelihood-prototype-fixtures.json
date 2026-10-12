@@ -1,0 +1,57 @@
+{
+  "metadata": {
+    "version": "livelihood-proto-v1",
+    "synthetic": true,
+    "status": "AI_DRAFT",
+    "humanApproved": false,
+    "fieldValidation": "NOT_RUN",
+    "crossLineageReview": "NOT_RUN"
+  },
+  "samples": [
+    {
+      "id": "S01",
+      "label": "合成白班岗位指导，本次指导完成不代表已就业",
+      "plan": {
+        "serviceType": "EMPLOYMENT", "subjectRef": "SYN-P01", "subjectConfirmed": true,
+        "consent": "CONFIRMED", "goal": "完成白班岗位指导并核对可工作时间，实际就业结果未知",
+        "owner": "SYN-W01", "nextAction": "联系合成就业服务站核对本次指导进展",
+        "nextActionAt": "2026-10-13T01:00:00.000Z", "referralTo": "合成就业服务站"
+      },
+      "steps": [
+        { "event": { "kind": "REFERRAL_SENT", "note": "合成转介已发出，尚未收到接收反馈" }, "expect": { "referralStatus": "SENT", "resultStatus": "UNKNOWN", "canResolve": false } },
+        { "event": { "kind": "REFERRAL_ACCEPTED", "note": "代记合成服务站反馈已接收" }, "expect": { "referralStatus": "ACCEPTED", "resultStatus": "UNKNOWN", "canResolve": false } },
+        { "event": { "kind": "SERVICE_PROVIDED", "note": "合成服务站已核对白班限制并提供岗位指导" }, "expect": { "referralStatus": "ACCEPTED", "resultStatus": "PROVIDED", "canResolve": false } },
+        { "event": { "kind": "RESULT_CONFIRMED", "note": "合成本人确认本次指导已完成，尚无入职反馈", "evidence": "合成对象本人对本次岗位指导的反馈" }, "expect": { "referralStatus": "ACCEPTED", "resultStatus": "CONFIRMED", "canResolve": true } }
+      ]
+    },
+    {
+      "id": "S02",
+      "label": "合成本次探访与独立新周期",
+      "plan": {
+        "serviceType": "VISIT", "subjectRef": "SYN-P02", "subjectConfirmed": true,
+        "consent": "CONFIRMED", "goal": "完成本次探访并约定下一次联系，助餐需求另行跟进",
+        "owner": "SYN-W02", "nextAction": "联系合成老人确认本次探访安排",
+        "nextActionAt": "2026-10-13T01:00:00.000Z", "referralTo": ""
+      },
+      "steps": [
+        { "event": { "kind": "SERVICE_PROVIDED", "note": "合成人工探访已完成，留下本次情况" }, "expect": { "referralStatus": "NONE", "resultStatus": "PROVIDED", "canResolve": false } },
+        { "event": { "kind": "RESULT_CONFIRMED", "note": "合成本人确认本次探访，约定再联系", "evidence": "合成老人本人对本次探访的反馈", "followUpAt": "2026-10-17T01:00:00.000Z" }, "expect": { "referralStatus": "NONE", "resultStatus": "CONFIRMED", "followUpAt": "2026-10-17T01:00:00.000Z", "canResolve": true } }
+      ],
+      "nextCycle": {
+        "previousCaseId": "SYN-C-V01",
+        "planPatch": { "consent": "UNKNOWN", "nextAction": "确认本轮服务意愿与具体安排", "nextActionAt": "2026-10-17T01:00:00.000Z" },
+        "expect": { "consent": "UNKNOWN", "referralStatus": "NONE", "resultStatus": "UNKNOWN", "resultEvidence": "", "followUpAt": null, "previousCaseId": "SYN-C-V01", "canResolve": false }
+      }
+    }
+  ],
+  "negatives": [
+    { "id": "N01", "sampleId": "S02", "beforeSteps": 0, "planPatch": { "consent": "REQUESTED" }, "operation": { "type": "EVENT", "event": { "kind": "SERVICE_PROVIDED", "note": "尝试将家属提议直接记为已提供探访" } }, "rejectCode": "INVALID_SERVICE_EVENT" },
+    { "id": "N02", "sampleId": "S01", "beforeSteps": 1, "operation": { "type": "CHECK_STATE" }, "expect": { "referralStatus": "SENT", "resultStatus": "UNKNOWN", "canResolve": false, "canCancel": false } },
+    { "id": "N03", "sampleId": "S01", "beforeSteps": 2, "operation": { "type": "CHECK_STATE" }, "expect": { "referralStatus": "ACCEPTED", "resultStatus": "UNKNOWN", "canResolve": false } },
+    { "id": "N04", "sampleId": "S01", "beforeSteps": 0, "operation": { "type": "EVENT", "event": { "kind": "RESULT_CONFIRMED", "note": "尚未提供指导就尝试确认结果", "evidence": "合成所谓本人反馈" } }, "rejectCode": "INVALID_SERVICE_EVENT" },
+    { "id": "N05", "sampleId": "S01", "beforeSteps": 4, "operation": { "type": "EVENT", "event": { "kind": "NO_CONTACT", "note": "新的合成联系未接通，原因未知", "followUpAt": "2026-10-17T01:00:00.000Z" } }, "expect": { "resultStatus": "UNKNOWN", "resultEvidence": "", "followUpAt": "2026-10-17T01:00:00.000Z", "canResolve": false, "canCancel": false } },
+    { "id": "N06", "sampleId": "S01", "beforeSteps": 4, "operation": { "type": "PLAN", "planPatch": { "subjectRef": "SYN-P03" } }, "rejectCode": "SERVICE_SUBJECT_IMMUTABLE" },
+    { "id": "N07", "sampleId": "S02", "beforeSteps": 1, "operation": { "type": "EVENT", "event": { "kind": "RESULT_CONFIRMED", "note": "合成探访确认但漏掉再联系时间", "evidence": "合成老人本人反馈" } }, "rejectCode": "INVALID_SERVICE_EVENT" },
+    { "id": "N08", "sampleId": "S01", "beforeSteps": 3, "operation": { "type": "EVENT", "event": { "kind": "RESULT_CONFIRMED", "note": "尝试不填写反馈依据就确认本次指导", "evidence": "" } }, "rejectCode": "INVALID_SERVICE_EVENT" }
+  ]
+}

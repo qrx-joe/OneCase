@@ -174,6 +174,9 @@ export default function CaseDetailPage() {
           </p>
         </div>
         <div className="actions">
+          <Link href={`/services?caseId=${encodeURIComponent(caseData.id)}`}>
+            <Button variant="secondary">服务跟进</Button>
+          </Link>
           <select
             className="field"
             style={{ width: 'auto', padding: '8px 32px 8px 10px', fontSize: 12 }}

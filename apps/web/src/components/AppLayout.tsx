@@ -68,6 +68,15 @@ export function AppLayout({ children, title }: AppLayoutProps) {
         </svg>
       ),
     },
+    {
+      href: '/services',
+      label: '民生服务',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="9" cy="7" r="3" /><path d="M3 20v-3a6 6 0 0 1 12 0v3M17 5v6M14 8h6M18 15v5" />
+        </svg>
+      ),
+    },
   ]
 
   // 通知汇总: 复用 /api/cases 活跃列表,失败时保持 null (不显示数字,不阻塞布局)

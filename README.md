@@ -32,6 +32,16 @@ AI Draft != Business Fact
 
 ## 当前功能范围
 
+2026-10-09 新增[民生服务最小原型](docs/devlog/LIVELIHOOD_PROTOTYPE_2026-10-09.md)：就业帮扶、老年助餐与探访的人工服务计划、下一步行动、转介/回访记录、结果确认和新周期。入口 `/services`，也可从已确认事项详情启动。完整 AI 民生场景提取和一线服务效果未验证；原物业分类字典保持。
+
+独立合成演示：`pnpm --filter @onecase/web dev:livelihood`，打开 [localhost:3200/services](http://localhost:3200/services)。使用独立数据库和构建目录、强制 Mock，不修改原 dev.db；具体数据边界与运行步骤见上述记录。
+
+2026-10-10 增加[待办与回访视图](docs/devlog/LIVELIHOOD_FOLLOW_UP_2026-10-10.md)：按负责人查看待联系、未来安排和全部事项，回访约定优先于旧计划，收尾记录进入历史。已做合成浏览器验证，实际记录负担与一线效果仍未验证。
+
+同日[任务复核与接续修正](docs/devlog/LIVELIHOOD_TASK_REVIEW_2026-10-10.md)增加“待接续”筛选，让历史后续约定可单独找到；人工新周期草稿沿用原约定日期，保存后才建立关联。六条合成任务不计作真人反馈。
+
+一线核对材料已准备：[民生流程走查执行说明](docs/testing/usability/livelihood-walkthrough-runbook.md)，配套 9 页可编辑 Word 与可打印 PDF，包含主持流程、参与者任务、匿名记录和下一轮取舍。真人走查未执行。
+
 | 功能                                   | 当前情况                                                                                                                       |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | 演示虚拟登录                           | 固定演示凭据（`onecase / onecase2026`，前端本机会话），打开任意页面先跳登录页；**无后端鉴权**，生产认证在试点前置清单最前                                                    |
@@ -141,6 +151,8 @@ pnpm --filter @onecase/web build     # 构建验证
 **CI**: GitHub Actions (`.github/workflows/ci.yml`) 在每次 push/PR 上自动跑 typecheck、单测（含 20 条合成 Eval）、全仓 build 与 Playwright E2E。
 
 2026-10-07 并发与构建修复：状态更新先判断版本，过期请求返回 409；新建与确认共用 SQLite 原子编号序列，保留历史编号并避免删除后重号；确认结果只在事务提交后返回。文字保存使用单次原子写入，修复旧版 CI 中同幂等键并发请求的事务超时；AI 响应与评估包装的两处类型错误已修复。实际 SQLite 四进程回归 **12/12**、单测 **244/244**、业务不变量 **99/99**、Playwright **32/32**、typecheck 与**全仓 build**通过，详见 [本轮记录](docs/devlog/CONCURRENCY_FIX_2026-10-07.md)。并发回归已加入 CI 配置，远程结果以对应提交的 [GitHub Actions](https://github.com/qrx-joe/OneCase/actions/workflows/ci.yml) 为准。项目尚未发布网站。
+
+2026-10-09 民生服务最小人工原型：单测 **258/258**、业务不变量 **99/99**、四进程并发 **12/12**、Playwright **38/38**、Web 类型检查与**全仓 build**通过；独立合成演示启动及保存通过。未调用真实模型或执行真人走查，详见 [实现与验证记录](docs/devlog/LIVELIHOOD_PROTOTYPE_2026-10-09.md)。
 
 已有数据库升级此版本前需运行 `pnpm --filter @onecase/db db:push` 与 `pnpm --filter @onecase/db db:generate`，新增 `CaseNumberSequence` 表，不重建业务数据。序列首次分配从当前最大合法 `CASE-N` 编号与 1000 中的较大值开始；已有编号不改写。删除已分配事项不会回退水位，失败事务同时回滚编号分配。当前本地 `dev.db` 已备份并完成新增表升级。
 

@@ -5,6 +5,16 @@
 - **材料**: [任务卡](./task-cards.md) × 8、[消息库](./messages-bank.md)、[记录表](./record-sheet.md)、配图 `tmp/usability-assets/`。
 - **前置**: 建议在阶段 0 至少完成 1-2 人访谈后再测（知道他们的现行方式才能对比）；至少做过一次完整彩排。
 
+**民生服务方向补充（2026-10-09）**：[就业帮扶与养老服务合成任务卡](./livelihood-scenario-cards.md)用于核对服务对象、转介、回访与结果收尾。现已有[最小人工跟进原型](../../devlog/LIVELIHOOD_PROTOTYPE_2026-10-09.md)，通过 `pnpm --filter @onecase/web dev:livelihood` 使用独立合成库；AI 提取扩展与一线走查仍未完成，浏览器回归不计入真人 Gate 1 通过结果。下文保留原八项可用性任务。
+
+开始组织民生流程走查时，使用[走查执行说明](./livelihood-walkthrough-runbook.md)与[9 页材料源稿](./livelihood-walkthrough-kit.md)，含主持人流程、独立参与者页、匿名记录与下一轮取舍；提供[可编辑 Word](./livelihood-walkthrough-kit.docx)及[可打印 PDF](./livelihood-walkthrough-kit.pdf)。一线反馈尚未取得，所有结果保持未执行。
+
+无经办人员时，先用[标准样本与验收约定](./standard.md)、[负例与人工清单](./negatives.md)和[可执行样本检查](./check-prototype.mts)核对现有原型的业务边界。两条合成样本与八条负例不计作真人 Gate 1；用户亲改和定标仍待完成。
+
+用户选择的待办与回访视图已接入原型；[六条合成记录检查](../../experiments/exp001-livelihood-follow-up/README.md)覆盖负责人筛选、时间来源、历史及未知结果。它是技术/展示验证，未产生参与者反馈，原走查包与候选标准未改写为已获认可。
+
+后续 [六条任务复核](../../experiments/exp002-follow-up-task-review/README.md)补充“待接续”入口并修复新周期预填日期。可用其任务问题作阅读自查；AI 判断与自动测试没有填入参与者反馈、成功率、用时或一线记录。
+
 ## 一、环境准备（测试前一天完成）
 
 1. `pnpm --filter @onecase/db db:push && db:seed`，然后 `pnpm --filter @onecase/web dev`（默认 3000 端口、mock Provider，离线可跑）。
